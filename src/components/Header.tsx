@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Calendar, PiggyBank, Settings, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, PiggyBank, Settings } from 'lucide-react';
 import { formatMonthDisplay } from '../utils/formatters';
 
 interface HeaderProps {
@@ -42,18 +42,10 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 pt-safe px-4 pb-2">
       {/* Top Brand Bar */}
       <div className="flex items-center justify-between py-2">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
-              로컬 가계부
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 font-medium border border-indigo-500/30">
-                PWA
-              </span>
-            </h1>
-          </div>
+        <div>
+          <h1 className="text-base font-bold tracking-tight text-white">
+            로컬 가계부
+          </h1>
         </div>
 
         {/* Tab Buttons */}
