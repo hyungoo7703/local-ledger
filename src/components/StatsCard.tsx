@@ -94,25 +94,26 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 
       {/* Budget Bar & Progress */}
       {baseBudgetWon > 0 && (
-        <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-800 text-xs space-y-2">
-          <div className="flex justify-between items-center text-slate-300 gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-slate-400 text-xs shrink-0">한계 예산:</span>
-              <span className="font-bold text-indigo-300 text-xs shrink-0">
-                {formatCompactKRW(adjustedBudgetWon)}
-              </span>
-              {totalPostBenefits > 0 && (
-                <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30 whitespace-nowrap shrink-0">
-                  +{formatCompactKRW(totalPostBenefits)} 혜택
-                </span>
-              )}
-            </div>
-
-            <span className={`font-semibold text-xs shrink-0 whitespace-nowrap ${isOverBudget ? 'text-rose-400' : 'text-indigo-300'}`}>
-              {budgetRatio}% ({isOverBudget ? '초과' : `${formatCompactKRW(remainingBudgetWon)} 남음`})
+        <div className="bg-slate-800/40 rounded-2xl p-3.5 border border-slate-800 text-xs space-y-2.5">
+          {/* Top Row: Title vs Remaining Status */}
+          <div className="flex justify-between items-center text-slate-300">
+            <span className="font-semibold text-slate-300 text-xs">
+              한계 소비 예산
             </span>
+
+            <div className="text-right whitespace-nowrap">
+              <span className={`font-bold ${isOverBudget ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {isOverBudget
+                  ? `${formatCompactKRW(Math.abs(remainingBudgetWon))} 초과`
+                  : `${formatCompactKRW(remainingBudgetWon)} 남음`}
+              </span>
+              <span className="text-[11px] text-slate-400 ml-1.5 font-normal">
+                ({budgetRatio}%)
+              </span>
+            </div>
           </div>
 
+          {/* Progress Bar */}
           <div className="w-full bg-slate-700/60 rounded-full h-2.5 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
@@ -120,10 +121,30 @@ export const StatsCard: React.FC<StatsCardProps> = ({
                   ? 'bg-rose-500'
                   : budgetRatio > 80
                   ? 'bg-amber-500'
-                  : 'bg-gradient-to-r from-indigo-500 to-emerald-400'
+                  : 'bg-gradient-to-r from-indigo-500 via-indigo-400 to-emerald-400'
               }`}
               style={{ width: `${Math.min(100, budgetRatio)}%` }}
             />
+          </div>
+
+          {/* Bottom Row: Detail Breakdown */}
+          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+            <div className="truncate">
+              <span>결제 예정 </span>
+              <strong className="text-slate-200">{formatCompactKRW(totalPlannedSpend)}</strong>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+              <span>총 한도</span>
+              <strong className="text-indigo-300 font-bold">
+                {formatCompactKRW(adjustedBudgetWon)}
+              </strong>
+              {totalPostBenefits > 0 && (
+                <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                  +{formatKRW(totalPostBenefits)} 혜택
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
