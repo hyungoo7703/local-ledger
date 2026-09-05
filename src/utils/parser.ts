@@ -35,7 +35,7 @@ export function parseQuickEntry(
       finalPrice: 0,
       benefitType: 'instant',
       benefitAmount: 0,
-      dealTag: '기타'
+      dealTag: ''
     };
   }
 
@@ -119,7 +119,7 @@ export function parseQuickEntry(
     finalPrice,
     benefitType: benefitAmount > 0 ? benefitType : 'instant',
     benefitAmount,
-    dealTag: dealTag || '기타'
+    dealTag: dealTag || ''
   };
 }
 

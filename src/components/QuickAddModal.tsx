@@ -36,7 +36,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [finalPrice, setFinalPrice] = useState<string>('');
   const [benefitType, setBenefitType] = useState<BenefitType>('instant');
   const [benefitAmount, setBenefitAmount] = useState<string>('');
-  const [dealTag, setDealTag] = useState('기타');
+  const [dealTag, setDealTag] = useState('');
   const [memo, setMemo] = useState('');
 
   const quickInputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +50,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         setFinalPrice(editItem.finalPrice ? String(editItem.finalPrice) : '');
         setBenefitType(editItem.benefitType || 'instant');
         setBenefitAmount(editItem.benefitAmount ? String(editItem.benefitAmount) : '');
-        setDealTag(editItem.dealTag || '기타');
+        setDealTag(editItem.dealTag || '');
         setMemo(editItem.memo || '');
         setQuickText('');
       } else {
@@ -60,7 +60,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         setFinalPrice('');
         setBenefitType('instant');
         setBenefitAmount('');
-        setDealTag(quickTags[0] || '삼성LINK');
+        setDealTag('');
         setMemo('');
         setQuickText('');
         // Focus quick input automatically on mobile/desktop
@@ -120,10 +120,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       finalBenefit = 0;
     }
 
-    const trimmedTag = (finalSelectedTag || '').trim() || '기타';
+    const trimmedTag = (finalSelectedTag || '').trim();
 
     // 직접 입력한 새 태그는 quickTags에 자동으로 등록하여 다음번 원터치 재사용 지원
-    if (trimmedTag !== '기타' && !quickTags.includes(trimmedTag)) {
+    if (trimmedTag && !quickTags.includes(trimmedTag)) {
       onAddTag(trimmedTag);
     }
 
