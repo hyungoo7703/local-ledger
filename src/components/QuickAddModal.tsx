@@ -16,6 +16,7 @@ interface QuickAddModalProps {
   onSave: (item: DealItem) => void;
   onDelete?: (id: string) => void;
   onAddTag: (tag: string) => void;
+  onDeleteTag?: (tag: string) => void;
 }
 
 export const QuickAddModal: React.FC<QuickAddModalProps> = ({
@@ -28,7 +29,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   onClose,
   onSave,
   onDelete,
-  onAddTag
+  onAddTag,
+  onDeleteTag
 }) => {
   const [quickText, setQuickText] = useState('');
   const [date, setDate] = useState('');
@@ -38,6 +40,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [benefitAmount, setBenefitAmount] = useState<string>('');
   const [dealTag, setDealTag] = useState('');
   const [memo, setMemo] = useState('');
+  const [isTagManageMode, setIsTagManageMode] = useState(false);
 
   const quickInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +71,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           quickInputRef.current?.focus();
         }, 150);
       }
+      setIsTagManageMode(false);
     }
   }, [isOpen, editItem, initialDate, quickTags]);
 
@@ -448,23 +452,62 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
 
             {/* Quick Chips list */}
             <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] text-slate-400 font-medium">
+                  자주 쓰는 태그
+                </span>
+                {quickTags.length > 0 && onDeleteTag && (
+                  <button
+                    type="button"
+                    onClick={() => setIsTagManageMode(!isTagManageMode)}
+                    className={`text-[10px] px-2 py-0.5 rounded-md transition font-medium ${
+                      isTagManageMode
+                        ? 'bg-rose-950/70 text-rose-300 border border-rose-800/60 font-bold'
+                        : 'text-slate-400 hover:text-slate-200 bg-slate-800/80 border border-slate-700/60'
+                    }`}
+                  >
+                    {isTagManageMode ? '편집 완료' : '태그 삭제/정리'}
+                  </button>
+                )}
+              </div>
+
               <div className="flex flex-wrap gap-1.5">
                 {quickTags.map((tag) => {
                   const isSelected = dealTag.trim().toLowerCase() === tag.toLowerCase();
                   return (
-                    <button
+                    <div
                       key={tag}
-                      type="button"
-                      onClick={() => setDealTag(tag)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all active:scale-95 flex items-center gap-1 ${
+                      className={`inline-flex items-center rounded-lg text-xs font-medium transition-all ${
                         isSelected
                           ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                           : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60'
                       }`}
                     >
-                      {isSelected && <Check className="w-3 h-3" />}
-                      {tag}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setDealTag(tag)}
+                        className="px-2.5 py-1 flex items-center gap-1 active:scale-95 transition"
+                      >
+                        {isSelected && <Check className="w-3 h-3" />}
+                        <span>{tag}</span>
+                      </button>
+
+                      {isTagManageMode && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (dealTag === tag) setDealTag('');
+                            onDeleteTag?.(tag);
+                          }}
+                          className="pr-2 pl-0.5 py-1 text-slate-400 hover:text-rose-400 active:scale-90 transition"
+                          title={`${tag} 삭제`}
+                          aria-label={`${tag} 삭제`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>

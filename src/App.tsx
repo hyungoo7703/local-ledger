@@ -107,6 +107,13 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleDeleteTag = (tagToDelete: string) => {
+    setAppState((prev) => ({
+      ...prev,
+      quickTags: prev.quickTags.filter((t) => t !== tagToDelete)
+    }));
+  };
+
   const handleUpdateSalaryConfig = (newConfig: SalaryConfig) => {
     setAppState((prev) => ({
       ...prev,
@@ -231,6 +238,7 @@ export const App: React.FC = () => {
         onSave={handleSaveDeal}
         onDelete={handleDeleteDeal}
         onAddTag={handleAddTag}
+        onDeleteTag={handleDeleteTag}
       />
     </div>
   );
