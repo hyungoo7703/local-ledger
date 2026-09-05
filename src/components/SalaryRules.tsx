@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { SalaryConfig, SalaryDeductionItem } from '../types';
-import { PiggyBank, Plus, Trash2, ShoppingBag, Landmark, ArrowRight, Check, AlertCircle } from 'lucide-react';
+import { SalaryConfig, SalaryDeductionItem, MonthlyChecklistItem } from '../types';
+import { PiggyBank, Plus, Trash2, ShoppingBag, Landmark, ArrowRight, Check, AlertCircle, ListChecks, CheckSquare, Square, RefreshCw } from 'lucide-react';
 import { formatCompactKRW, generateId } from '../utils/formatters';
 import { calculateRemainingSalary, calculateSpendingLimitManwon, calculateTotalDeductions } from '../utils/storage';
 
@@ -11,6 +11,7 @@ interface SalaryRulesProps {
 }
 
 const PRESET_NAMES = ['ISA 저금', '청약 저축', '국민카드', '신한카드', '고정지출(월세/공과)', '비상금'];
+const CHECKLIST_PRESETS = ['월세 송금', '관리비 납부', '청약 입금', 'ISA 저축', '카드대금 결제'];
 
 export const SalaryRules: React.FC<SalaryRulesProps> = ({
   config,
@@ -22,6 +23,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   );
   const [payday, setPayday] = useState<number>(config.payday || 25);
   const [deductions, setDeductions] = useState<SalaryDeductionItem[]>(config.deductions || []);
+  const [checklist, setChecklist] = useState<MonthlyChecklistItem[]>(config.checklist || []);
 
   // Quick Add Form States
   const [quickOneLiner, setQuickOneLiner] = useState('');
@@ -29,10 +31,14 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   const [newAmount, setNewAmount] = useState('');
   const [newIsSpending, setNewIsSpending] = useState(false);
 
+  // Checklist Form State
+  const [newChecklistTitle, setNewChecklistTitle] = useState('');
+
   React.useEffect(() => {
     setBaseSalaryInput(config.baseSalaryManwon ? String(config.baseSalaryManwon) : '');
     setPayday(config.payday || 25);
     setDeductions(config.deductions || []);
+    setChecklist(config.checklist || []);
   }, [config]);
 
   const baseSalaryManwon = parseInt(baseSalaryInput, 10) || 0;
@@ -136,6 +142,64 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
     setNewAmount('');
     setNewIsSpending(false);
   };
+
+  // Checklist Handlers
+  const handleToggleCheck = (id: string) => {
+    const updated = checklist.map((item) =>
+      item.id === id ? { ...item, isChecked: !item.isChecked } : item
+    );
+    setChecklist(updated);
+    onUpdateConfig({ ...config, deductions, checklist: updated });
+  };
+
+  const handleResetAllChecks = () => {
+    if (checklist.length === 0) return;
+    if (window.confirm('새 달 시작: 모든 항목의 체크를 해제할까요?')) {
+      const updated = checklist.map((item) => ({ ...item, isChecked: false }));
+      setChecklist(updated);
+      onUpdateConfig({ ...config, deductions, checklist: updated });
+    }
+  };
+
+  const handleAddChecklistItem = (title?: string) => {
+    const text = (title || newChecklistTitle).trim();
+    if (!text) return;
+
+    const newItem: MonthlyChecklistItem = {
+      id: generateId(),
+      title: text,
+      isChecked: false
+    };
+
+    const updated = [...checklist, newItem];
+    setChecklist(updated);
+    onUpdateConfig({ ...config, deductions, checklist: updated });
+    setNewChecklistTitle('');
+  };
+
+  const handleImportFromDeductions = () => {
+    const existingTitles = new Set(checklist.map((c) => c.title));
+    const toAdd = deductions
+      .map((d) => d.name)
+      .filter((name) => !existingTitles.has(name))
+      .map((name) => ({ id: generateId(), title: name, isChecked: false }));
+
+    if (toAdd.length === 0) {
+      alert('이미 모든 차감 항목이 체크리스트에 추가되어 있습니다.');
+      return;
+    }
+    const updated = [...checklist, ...toAdd];
+    setChecklist(updated);
+    onUpdateConfig({ ...config, deductions, checklist: updated });
+  };
+
+  const handleDeleteChecklistItem = (id: string) => {
+    const updated = checklist.filter((item) => item.id !== id);
+    setChecklist(updated);
+    onUpdateConfig({ ...config, deductions, checklist: updated });
+  };
+
+  const completedCheckCount = checklist.filter((c) => c.isChecked).length;
 
   return (
     <div className="space-y-4 pb-12">
@@ -494,6 +558,154 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* 5. 이달의 고정 처리 체크리스트 (모달/카드 느낌의 하단 섹션) */}
+      <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-xl space-y-3.5 mt-6">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-indigo-600/30 text-indigo-400 flex items-center justify-center shrink-0">
+              <ListChecks className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                이달의 고정 처리 체크리스트
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                  checklist.length > 0 && completedCheckCount === checklist.length
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                    : 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
+                }`}>
+                  {completedCheckCount}/{checklist.length} 완료
+                </span>
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                월세, 청약, 공과금 납부를 체크하고 새 달에는 '전체 해제'로 시작합니다.
+              </p>
+            </div>
+          </div>
+
+          {/* 전체 체크 해제 버튼 (새 달 시작) */}
+          {checklist.length > 0 && (
+            <button
+              type="button"
+              onClick={handleResetAllChecks}
+              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-medium border border-slate-700 transition active:scale-95"
+              title="새 달 시작: 모든 항목의 체크를 해제합니다"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
+              <span>전체 해제</span>
+            </button>
+          )}
+        </div>
+
+        {/* 차감 항목에서 가져오기 버튼 (체크리스트가 비어있거나 추가할 항목이 있을 때) */}
+        {deductions.length > 0 && (
+          <div className="flex items-center justify-between bg-slate-800/40 p-2 rounded-xl border border-slate-800 text-xs">
+            <span className="text-slate-400">차감 룰 항목을 체크리스트로 복사할 수 있습니다.</span>
+            <button
+              type="button"
+              onClick={handleImportFromDeductions}
+              className="px-2.5 py-1 bg-indigo-600/30 hover:bg-indigo-600/40 text-indigo-300 font-medium rounded-lg text-[11px] border border-indigo-500/30 transition shrink-0"
+            >
+              + 차감 항목 가져오기
+            </button>
+          </div>
+        )}
+
+        {/* 새 체크 항목 추가 폼 */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleAddChecklistItem();
+          }}
+          className="flex gap-2"
+        >
+          <input
+            type="text"
+            placeholder="체크할 고정 항목 (예: 월세 이체, 관리비 납부)"
+            value={newChecklistTitle}
+            onChange={(e) => setNewChecklistTitle(e.target.value)}
+            className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+          />
+          <button
+            type="submit"
+            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shrink-0 transition active:scale-95 flex items-center gap-1"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>추가</span>
+          </button>
+        </form>
+
+        {/* 프리셋 칩 */}
+        <div className="flex flex-wrap gap-1">
+          {CHECKLIST_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => handleAddChecklistItem(preset)}
+              className="px-2 py-0.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[11px] border border-slate-800 transition"
+            >
+              +{preset}
+            </button>
+          ))}
+        </div>
+
+        {/* 체크리스트 항목 목록 */}
+        {checklist.length === 0 ? (
+          <div className="p-4 text-center text-xs text-slate-500 bg-slate-950/30 rounded-xl border border-slate-800/60">
+            등록된 고정 처리 항목이 없습니다. 매달 잊지 말아야 할 이체·결제 항목을 등록해 보세요.
+          </div>
+        ) : (
+          <div className="space-y-1.5 pt-1">
+            {checklist.map((item) => (
+              <div
+                key={item.id}
+                className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${
+                  item.isChecked
+                    ? 'bg-slate-950/40 border-slate-800/50 opacity-60'
+                    : 'bg-slate-800/70 border-slate-700/80 hover:border-slate-600'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleToggleCheck(item.id)}
+                  className="flex items-center gap-2.5 min-w-0 flex-1 text-left active:scale-[0.99] transition"
+                >
+                  {item.isChecked ? (
+                    <CheckSquare className="w-5 h-5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <Square className="w-5 h-5 text-slate-500 hover:text-slate-300 shrink-0" />
+                  )}
+                  <span
+                    className={`text-xs font-medium truncate ${
+                      item.isChecked
+                        ? 'line-through text-slate-400'
+                        : 'text-white'
+                    }`}
+                  >
+                    {item.title}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteChecklistItem(item.id)}
+                  className="p-1 text-slate-500 hover:text-rose-400 rounded-lg transition shrink-0"
+                  title="삭제"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* All completed celebratory card */}
+        {checklist.length > 0 && completedCheckCount === checklist.length && (
+          <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-300 font-medium text-center">
+            이번 달 모든 고정 처리가 완료되었습니다. 다음 달에는 상단 '전체 해제'로 새로 시작하세요!
           </div>
         )}
       </div>

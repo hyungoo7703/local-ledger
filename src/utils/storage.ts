@@ -16,7 +16,8 @@ export const DEFAULT_QUICK_TAGS = [
 export const DEFAULT_SALARY_CONFIG: SalaryConfig = {
   baseSalaryManwon: 0,
   payday: 25,
-  deductions: []
+  deductions: [],
+  checklist: []
 };
 
 export function calculateTotalDeductions(config: SalaryConfig): number {
@@ -51,6 +52,9 @@ export function loadAppState(): AppState {
     const parsed = JSON.parse(raw) as AppState;
     if (!Array.isArray(parsed.deals) || !parsed.salaryConfig?.deductions) {
       throw new Error('Schema update needed');
+    }
+    if (!parsed.salaryConfig.checklist) {
+      parsed.salaryConfig.checklist = [];
     }
     return parsed;
   } catch (err) {

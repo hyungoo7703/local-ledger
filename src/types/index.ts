@@ -18,10 +18,17 @@ export interface SalaryDeductionItem {
   isSpending: boolean; // 소비(한계소비) 항목 여부 (true: 플랜의 한계소비 기준)
 }
 
+export interface MonthlyChecklistItem {
+  id: string;
+  title: string; // e.g. "월세 이체", "청약 납부", "ISA 입금"
+  isChecked: boolean; // 이달 처리 완료 여부
+}
+
 export interface SalaryConfig {
   baseSalaryManwon: number; // 월급 실수령액 (만원 단위, e.g. 300 = 300만원)
   payday: number; // 월급일 (1 ~ 31)
   deductions: SalaryDeductionItem[]; // 만원단위 차감 항목 리스트
+  checklist?: MonthlyChecklistItem[]; // 이달의 고정 처리 체크리스트
 }
 
 export interface AppState {
