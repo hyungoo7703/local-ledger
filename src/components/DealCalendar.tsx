@@ -1,6 +1,5 @@
 import React from 'react';
 import { DealItem } from '../types';
-import { Sparkles } from 'lucide-react';
 
 interface DealCalendarProps {
   currentYear: number;
@@ -91,19 +90,24 @@ export const DealCalendar: React.FC<DealCalendarProps> = ({
           )}
         </div>
 
-        {/* Deals Indicator / Benefit preview */}
+        {/* Deals Indicator with benefit dot */}
         {hasDeals ? (
           <div className="w-full px-0.5 mt-auto">
-            {totalBenefit > 0 ? (
-              <div className="text-[9px] font-bold text-pink-400 truncate flex items-center justify-center gap-0.5 bg-pink-950/40 rounded py-0.5 border border-pink-500/20">
-                <Sparkles className="w-2.5 h-2.5 shrink-0" />
-                <span>+{Math.round(totalBenefit / 1000)}k</span>
-              </div>
-            ) : (
-              <div className="text-[9px] font-medium text-indigo-300 truncate text-center bg-indigo-950/40 rounded py-0.5">
-                {dayDeals.length}건
-              </div>
-            )}
+            <div
+              className={`text-[9px] font-medium truncate flex items-center justify-center gap-1 rounded py-0.5 ${
+                totalBenefit > 0
+                  ? 'bg-indigo-950/70 border border-emerald-500/40 text-indigo-200 shadow-sm shadow-emerald-950/50'
+                  : 'bg-indigo-950/40 text-indigo-300'
+              }`}
+            >
+              {totalBenefit > 0 && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 shadow-sm shadow-emerald-400/60"
+                  title="사후 혜택 포함"
+                />
+              )}
+              <span>{dayDeals.length}건</span>
+            </div>
           </div>
         ) : (
           <div className="h-4" />
