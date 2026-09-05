@@ -141,22 +141,22 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
     <div className="space-y-4 pb-12">
       {/* 1. Top Card: Salary in Manwon */}
       <div className="bg-gradient-to-br from-slate-900 to-indigo-950/40 rounded-2xl p-4 border border-slate-800 shadow-xl space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600/30 text-indigo-400 flex items-center justify-center">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-xl bg-indigo-600/30 text-indigo-400 flex items-center justify-center shrink-0">
               <PiggyBank className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">월급 및 차감 룰</h3>
-              <p className="text-[11px] text-slate-400">
-                월급에서 저축·소비를 만원 단위로 차감하여 틀을 짭니다.
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-white tracking-tight">월급 차감 룰</h3>
+              <p className="text-[11px] text-slate-400 truncate">
+                저축·소비를 만원 단위로 차감
               </p>
             </div>
           </div>
 
           {/* Payday badge */}
-          <div className="text-right">
-            <label className="text-[10px] text-slate-400 block">급여일</label>
+          <div className="shrink-0 flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700/60">
+            <span className="text-[11px] text-slate-400 font-medium">급여일</span>
             <select
               value={payday}
               onChange={(e) => {
@@ -164,10 +164,10 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
                 setPayday(val);
                 onUpdateConfig({ ...config, payday: val });
               }}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-indigo-300 font-semibold focus:outline-none"
+              className="bg-transparent text-xs text-indigo-300 font-bold focus:outline-none cursor-pointer"
             >
               {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={d}>
+                <option key={d} value={d} className="bg-slate-800 text-white">
                   {d}일
                 </option>
               ))}
