@@ -4,7 +4,7 @@ import { formatCompactKRW, formatKRW } from '../utils/formatters';
 
 interface StatsCardProps {
   totalPlannedSpend: number; // 실제 결제(승인) 예정 총액 (원)
-  totalPostBenefits: number; // 사후 혜택 총액 (청구할인 + 적립) (원)
+  totalPostBenefits: number; // 혜택 총액 (청구할인 + 적립) (원)
   billDiscountTotal: number; // 결제일 청구할인 합계 (원)
   pointRewardTotal: number; // 포인트/캐시백 적립 합계 (원)
   completedCount: number;
@@ -21,7 +21,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   totalCount,
   baseBudgetWon
 }) => {
-  // 사후 혜택(청구할인, 포인트적립)이 발생하면 한계 소비 예산이 늘어남
+  // 혜택(청구할인, 포인트적립)이 발생하면 한계 소비 예산이 늘어남
   const adjustedBudgetWon = baseBudgetWon + totalPostBenefits;
   const netSpend = Math.max(0, totalPlannedSpend - totalPostBenefits);
   const remainingBudgetWon = adjustedBudgetWon - totalPlannedSpend;
@@ -64,7 +64,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
             <div className="flex items-center justify-between text-xs text-pink-300 mb-1">
               <span className="font-semibold flex items-center gap-1 whitespace-nowrap">
                 <Sparkles className="w-3.5 h-3.5 text-pink-400 shrink-0" />
-                사후 혜택
+                혜택
               </span>
               <TrendingDown className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             </div>

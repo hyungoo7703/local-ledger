@@ -103,7 +103,7 @@ export const DealCalendar: React.FC<DealCalendarProps> = ({
               {totalBenefit > 0 && (
                 <span
                   className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 shadow-sm shadow-emerald-400/60"
-                  title="사후 혜택 포함"
+                  title="혜택 포함"
                 />
               )}
               <span>{dayDeals.length}건</span>

@@ -7,7 +7,7 @@ import { calculateRemainingSalary, calculateSpendingLimitManwon, calculateTotalD
 interface SalaryRulesProps {
   config: SalaryConfig;
   currentPlannedDealsSpend: number; // in KRW (원)
-  totalPostBenefits?: number; // in KRW (원) 사후 혜택 총액
+  totalPostBenefits?: number; // in KRW (원) 혜택 총액 (청구할인 + 적립)
   onUpdateConfig: (newConfig: SalaryConfig) => void;
 }
 
@@ -356,7 +356,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
           </div>
           {totalPostBenefits > 0 && (
             <div className="text-[11px] text-emerald-400 font-medium">
-              ✨ 사후 혜택 +{formatCompactKRW(totalPostBenefits)} 반영으로 한계 예산 확대됨
+              ✨ 혜택 +{formatCompactKRW(totalPostBenefits)} 반영으로 한계 예산 확대됨
             </div>
           )}
           <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden mt-1">

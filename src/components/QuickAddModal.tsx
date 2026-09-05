@@ -146,7 +146,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
 
     onSave(item);
 
-    // 사후 혜택이 있을 때 경쾌한 폭죽 효과
+    // 혜택(청구할인/적립)이 있을 때 경쾌한 폭죽 효과
     if (finalBenefit > 0) {
       confetti({
         particleCount: 50,

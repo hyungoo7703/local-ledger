@@ -109,7 +109,7 @@ export function importBackupJson(jsonStr: string): AppState {
     throw new Error('유효하지 않은 가계부 백업 데이터입니다.');
   }
 
-  // 1. Deals 복원 (사후 혜택 및 즉시할인 호환 복원)
+  // 1. Deals 복원 (혜택 및 즉시할인 호환 복원)
   const deals = Array.isArray(parsed.deals)
     ? parsed.deals.map((d: any) => ({
         id: String(d.id || Date.now() + Math.random()),
