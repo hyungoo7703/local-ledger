@@ -1,7 +1,6 @@
-import { AppState, DealItem, SalaryConfig } from '../types';
-import { getTodayString } from './formatters';
+import { AppState, SalaryConfig } from '../types';
 
-const STORAGE_KEY = 'LOCAL_LEDGER_DATA_V2';
+const STORAGE_KEY = 'LOCAL_LEDGER_DATA_V3';
 
 export const DEFAULT_QUICK_TAGS = [
   '배민',
@@ -15,39 +14,27 @@ export const DEFAULT_QUICK_TAGS = [
 ];
 
 export const DEFAULT_SALARY_CONFIG: SalaryConfig = {
-  baseSalary: 0,
+  baseSalaryManwon: 0,
   payday: 25,
-  rules: [
-    {
-      id: 'rule-fixed',
-      name: '고정지출 (월세/공과/보험)',
-      ratio: 30,
-      color: '#64748b',
-      description: '숨만 쉬어도 나가는 필수 고정비'
-    },
-    {
-      id: 'rule-save',
-      name: '저축 & 투자',
-      ratio: 40,
-      color: '#10b981',
-      description: '미래를 위한 최우선 배분'
-    },
-    {
-      id: 'rule-deal',
-      name: '특가 & 혜택 소비 예산',
-      ratio: 15,
-      color: '#6366f1',
-      description: '세일/이벤트 때 챙겨먹고 살 혜택 예산'
-    },
-    {
-      id: 'rule-flex',
-      name: '자유 생활비 / 식비',
-      ratio: 15,
-      color: '#f59e0b',
-      description: '일상 식비 및 유동 지출'
-    }
-  ]
+  deductions: []
 };
+
+export function calculateTotalDeductions(config: SalaryConfig): number {
+  if (!config?.deductions) return 0;
+  return config.deductions.reduce((sum, item) => sum + (Number(item.amountManwon) || 0), 0);
+}
+
+export function calculateRemainingSalary(config: SalaryConfig): number {
+  if (!config) return 0;
+  return (config.baseSalaryManwon || 0) - calculateTotalDeductions(config);
+}
+
+export function calculateSpendingLimitManwon(config: SalaryConfig): number {
+  if (!config?.deductions) return 0;
+  return config.deductions
+    .filter((item) => item.isSpending)
+    .reduce((sum, item) => sum + (Number(item.amountManwon) || 0), 0);
+}
 
 export function loadAppState(): AppState {
   try {
@@ -62,17 +49,19 @@ export function loadAppState(): AppState {
       return initial;
     }
     const parsed = JSON.parse(raw) as AppState;
-    if (!Array.isArray(parsed.deals) || !parsed.salaryConfig) {
-      throw new Error('Invalid schema');
+    if (!Array.isArray(parsed.deals) || !parsed.salaryConfig?.deductions) {
+      throw new Error('Schema update needed');
     }
     return parsed;
   } catch (err) {
-    console.warn('Failed to load from localStorage, fallback to empty defaults', err);
-    return {
+    console.warn('Initializing clean V3 state:', err);
+    const initial: AppState = {
       deals: [],
       salaryConfig: DEFAULT_SALARY_CONFIG,
       quickTags: DEFAULT_QUICK_TAGS
     };
+    saveAppState(initial);
+    return initial;
   }
 }
 
@@ -90,7 +79,7 @@ export function exportBackupJson(state: AppState): string {
 
 export function importBackupJson(jsonStr: string): AppState {
   const parsed = JSON.parse(jsonStr) as AppState;
-  if (!Array.isArray(parsed.deals) || !parsed.salaryConfig?.rules) {
+  if (!Array.isArray(parsed.deals) || !parsed.salaryConfig?.deductions) {
     throw new Error('유효하지 않은 가계부 백업 데이터 형식입니다.');
   }
   saveAppState(parsed);
@@ -106,4 +95,3 @@ export function resetToDefault(): AppState {
   saveAppState(initial);
   return initial;
 }
-

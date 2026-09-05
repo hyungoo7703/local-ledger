@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, DealItem, SalaryConfig } from './types';
-import { loadAppState, saveAppState } from './utils/storage';
+import { loadAppState, saveAppState, calculateSpendingLimitManwon } from './utils/storage';
 import { getTodayString } from './utils/formatters';
 import { Header } from './components/Header';
 import { StatsCard } from './components/StatsCard';
@@ -50,11 +50,10 @@ export const App: React.FC = () => {
     return currentMonthDeals.filter((d) => d.isCompleted).length;
   }, [currentMonthDeals]);
 
-  // Find deal budget from salary rules
-  const dealBudget = useMemo(() => {
-    const rules = appState.salaryConfig.rules;
-    const rule = rules.find((r) => r.name.includes('특가') || r.name.includes('혜택') || r.name.includes('쇼핑')) || rules[2];
-    return rule ? Math.round((appState.salaryConfig.baseSalary * rule.ratio) / 100) : 0;
+  // Find deal budget (한계 소비 예산) from salary deductions
+  const spendingLimitWon = useMemo(() => {
+    const limitManwon = calculateSpendingLimitManwon(appState.salaryConfig);
+    return limitManwon * 10000;
   }, [appState.salaryConfig]);
 
   // Handlers
@@ -145,7 +144,7 @@ export const App: React.FC = () => {
               totalDiscountSaved={totalDiscountSaved}
               completedCount={completedCount}
               totalCount={currentMonthDeals.length}
-              dealBudget={dealBudget}
+              dealBudget={spendingLimitWon}
             />
 
             {/* Calendar Grid */}

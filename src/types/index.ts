@@ -11,18 +11,17 @@ export interface DealItem {
   createdAt: number;
 }
 
-export interface SalaryRuleItem {
+export interface SalaryDeductionItem {
   id: string;
-  name: string; // e.g. "고정비", "저축/투자", "특가/쇼핑 예산", "자유 생활비"
-  ratio: number; // 퍼센트 (e.g. 30%)
-  color: string;
-  description?: string;
+  name: string; // e.g. "ISA 저금", "국민카드", "청약", "고정지출"
+  amountManwon: number; // 만원 단위 (e.g. 100 = 100만원, 40 = 40만원)
+  isSpending: boolean; // 소비(한계소비) 항목 여부 (true: 플랜의 한계소비 기준)
 }
 
 export interface SalaryConfig {
-  baseSalary: number; // 월급 (e.g. 3,000,000)
+  baseSalaryManwon: number; // 월급 실수령액 (만원 단위, e.g. 300 = 300만원)
   payday: number; // 월급일 (1 ~ 31)
-  rules: SalaryRuleItem[];
+  deductions: SalaryDeductionItem[]; // 만원단위 차감 항목 리스트
 }
 
 export interface AppState {

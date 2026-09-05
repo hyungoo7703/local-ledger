@@ -191,7 +191,7 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
       <div className="bg-slate-900/60 rounded-2xl p-4 border border-slate-800 space-y-2">
         <div className="flex items-center gap-2 text-slate-300">
           <Smartphone className="w-4 h-4 text-indigo-400" />
-          <h4 className="text-xs font-bold">📱 내 폰에 앱으로 설치하는 법</h4>
+          <h4 className="text-xs font-bold">스마트폰에 앱으로 설치하는 법</h4>
         </div>
         <ul className="text-[11px] text-slate-400 space-y-1.5 pl-4 list-disc">
           <li>

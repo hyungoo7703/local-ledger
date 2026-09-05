@@ -62,7 +62,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
         <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-800 text-xs space-y-1.5">
           <div className="flex justify-between items-center text-slate-300">
             <span className="text-slate-400">
-              특가 예산 대비 ({formatCompactKRW(dealBudget)})
+              한계 소비 예산 대비 ({formatCompactKRW(dealBudget)})
             </span>
             <span className={`font-semibold ${isOverBudget ? 'text-rose-400' : 'text-indigo-300'}`}>
               {budgetRatio}% ({isOverBudget ? '초과' : `${formatCompactKRW(remainingBudget)} 남음`})

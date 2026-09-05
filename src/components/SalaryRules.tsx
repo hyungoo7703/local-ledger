@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { SalaryConfig, SalaryRuleItem } from '../types';
-import { PiggyBank, Plus, Trash2, AlertCircle, Check, Info } from 'lucide-react';
-import { formatCompactKRW, formatKRW, generateId } from '../utils/formatters';
+import { SalaryConfig, SalaryDeductionItem } from '../types';
+import { PiggyBank, Plus, Trash2, ShoppingBag, Landmark, ArrowRight, Check, AlertCircle } from 'lucide-react';
+import { formatCompactKRW, generateId } from '../utils/formatters';
+import { calculateRemainingSalary, calculateSpendingLimitManwon, calculateTotalDeductions } from '../utils/storage';
 
 interface SalaryRulesProps {
   config: SalaryConfig;
-  currentPlannedDealsSpend: number;
+  currentPlannedDealsSpend: number; // in KRW (원)
   onUpdateConfig: (newConfig: SalaryConfig) => void;
 }
+
+const PRESET_NAMES = ['ISA 저금', '청약 저축', '국민카드', '신한카드', '고정지출(월세/공과)', '비상금'];
 
 export const SalaryRules: React.FC<SalaryRulesProps> = ({
   config,
@@ -15,65 +18,128 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   onUpdateConfig
 }) => {
   const [baseSalaryInput, setBaseSalaryInput] = useState<string>(
-    config.baseSalary ? String(config.baseSalary) : ''
+    config.baseSalaryManwon ? String(config.baseSalaryManwon) : ''
   );
   const [payday, setPayday] = useState<number>(config.payday || 25);
-  const [rules, setRules] = useState<SalaryRuleItem[]>(config.rules);
+  const [deductions, setDeductions] = useState<SalaryDeductionItem[]>(config.deductions || []);
+
+  // Quick Add Form States
+  const [quickOneLiner, setQuickOneLiner] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newAmount, setNewAmount] = useState('');
+  const [newIsSpending, setNewIsSpending] = useState(false);
 
   React.useEffect(() => {
-    setBaseSalaryInput(config.baseSalary ? String(config.baseSalary) : '');
+    setBaseSalaryInput(config.baseSalaryManwon ? String(config.baseSalaryManwon) : '');
     setPayday(config.payday || 25);
-    setRules(config.rules);
+    setDeductions(config.deductions || []);
   }, [config]);
 
-  const totalRatio = rules.reduce((sum, r) => sum + (Number(r.ratio) || 0), 0);
-  const isRatioValid = totalRatio === 100;
+  const baseSalaryManwon = parseInt(baseSalaryInput, 10) || 0;
+  const currentConfig: SalaryConfig = {
+    baseSalaryManwon,
+    payday,
+    deductions
+  };
+
+  const totalDeductionsManwon = calculateTotalDeductions(currentConfig);
+  const remainingManwon = calculateRemainingSalary(currentConfig);
+  const spendingLimitManwon = calculateSpendingLimitManwon(currentConfig);
+  const spendingLimitWon = spendingLimitManwon * 10000;
 
   const handleSalaryBlur = () => {
     const parsed = parseInt(baseSalaryInput.replace(/\D/g, ''), 10) || 0;
-    const updated = { ...config, baseSalary: parsed, payday, rules };
+    const updated = { ...config, baseSalaryManwon: parsed, payday, deductions };
     onUpdateConfig(updated);
   };
 
-  const handleRatioChange = (id: string, newRatio: number) => {
-    const updatedRules = rules.map((r) =>
-      r.id === id ? { ...r, ratio: Math.max(0, Math.min(100, newRatio)) } : r
+  const handleToggleSpending = (id: string) => {
+    const updated = deductions.map((item) =>
+      item.id === id ? { ...item, isSpending: !item.isSpending } : item
     );
-    setRules(updatedRules);
-    onUpdateConfig({ ...config, baseSalary: config.baseSalary, payday, rules: updatedRules });
+    setDeductions(updated);
+    onUpdateConfig({ ...config, deductions: updated });
   };
 
-  const handleAddRule = () => {
-    const newRule: SalaryRuleItem = {
+  const handleAmountChange = (id: string, amount: number) => {
+    const updated = deductions.map((item) =>
+      item.id === id ? { ...item, amountManwon: Math.max(0, amount) } : item
+    );
+    setDeductions(updated);
+    onUpdateConfig({ ...config, deductions: updated });
+  };
+
+  const handleStepAmount = (id: string, step: number) => {
+    const updated = deductions.map((item) =>
+      item.id === id ? { ...item, amountManwon: Math.max(0, item.amountManwon + step) } : item
+    );
+    setDeductions(updated);
+    onUpdateConfig({ ...config, deductions: updated });
+  };
+
+  const handleDeleteItem = (id: string) => {
+    const updated = deductions.filter((item) => item.id !== id);
+    setDeductions(updated);
+    onUpdateConfig({ ...config, deductions: updated });
+  };
+
+  // 한 줄 퀵 추가 파서 (예: "ISA 100", "국민카드 40 소비")
+  const handleQuickAddOneLiner = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const text = quickOneLiner.trim();
+    if (!text) return;
+
+    const isSpending = text.includes('소비') || text.includes('카드');
+    // 숫자 추출
+    const numMatch = text.match(/(\d+)/);
+    const amount = numMatch ? parseInt(numMatch[1], 10) : 0;
+    // 이름 추출 (숫자 및 '소비', '만원' 단어 제외)
+    let cleanName = text
+      .replace(/(\d+)(?:만|만원)?/, '')
+      .replace(/\b소비\b/, '')
+      .replace(/[:=]/g, '')
+      .trim();
+
+    if (!cleanName) cleanName = isSpending ? '카드 소비' : '저축 항목';
+
+    const newItem: SalaryDeductionItem = {
       id: generateId(),
-      name: '새 항목',
-      ratio: 10,
-      color: '#a855f7',
-      description: '추가 배분 항목'
+      name: cleanName,
+      amountManwon: amount,
+      isSpending
     };
-    const updated = [...rules, newRule];
-    setRules(updated);
-    onUpdateConfig({ ...config, rules: updated });
+
+    const updated = [...deductions, newItem];
+    setDeductions(updated);
+    onUpdateConfig({ ...config, deductions: updated });
+    setQuickOneLiner('');
   };
 
-  const handleDeleteRule = (id: string) => {
-    if (rules.length <= 1) {
-      alert('최소 1개 이상의 분배 규칙이 필요합니다.');
-      return;
-    }
-    const updated = rules.filter((r) => r.id !== id);
-    setRules(updated);
-    onUpdateConfig({ ...config, rules: updated });
-  };
+  // 수동 폼 추가
+  const handleAddManual = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
 
-  // Find the deal/shopping rule
-  const dealRule = rules.find((r) => r.name.includes('특가') || r.name.includes('혜택') || r.name.includes('쇼핑')) || rules[2];
-  const dealBudget = dealRule ? Math.round((config.baseSalary * dealRule.ratio) / 100) : 0;
-  const remainingDealBudget = dealBudget - currentPlannedDealsSpend;
+    const amount = parseInt(newAmount.replace(/\D/g, ''), 10) || 0;
+    const newItem: SalaryDeductionItem = {
+      id: generateId(),
+      name: newName.trim(),
+      amountManwon: amount,
+      isSpending: newIsSpending
+    };
+
+    const updated = [...deductions, newItem];
+    setDeductions(updated);
+    onUpdateConfig({ ...config, deductions: updated });
+
+    setNewName('');
+    setNewAmount('');
+    setNewIsSpending(false);
+  };
 
   return (
     <div className="space-y-4 pb-12">
-      {/* Top Card: Base Salary */}
+      {/* 1. Top Card: Salary in Manwon */}
       <div className="bg-gradient-to-br from-slate-900 to-indigo-950/40 rounded-2xl p-4 border border-slate-800 shadow-xl space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -81,16 +147,16 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
               <PiggyBank className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">월급 기본 분배 규칙</h3>
+              <h3 className="text-sm font-bold text-white">월급 및 차감 룰</h3>
               <p className="text-[11px] text-slate-400">
-                수입이 들어오면 어디에 얼마를 쓸지 기준을 세워둡니다.
+                월급에서 저축·소비를 만원 단위로 차감하여 틀을 짭니다.
               </p>
             </div>
           </div>
 
           {/* Payday badge */}
           <div className="text-right">
-            <label className="text-[10px] text-slate-400 block">매월 급여일</label>
+            <label className="text-[10px] text-slate-400 block">급여일</label>
             <select
               value={payday}
               onChange={(e) => {
@@ -109,198 +175,327 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
           </div>
         </div>
 
-        {/* Base Salary Input */}
+        {/* Base Salary Input (만원 단위) */}
         <div>
           <label className="block text-xs font-medium text-slate-300 mb-1">
-            월 실수령액 (기준 예산)
+            월 실수령액 (만원 단위 입력)
           </label>
           <div className="relative">
             <input
               type="text"
               inputMode="numeric"
-              placeholder="월급을 입력해주세요 (예: 3,000,000)"
-              value={baseSalaryInput && Number(baseSalaryInput) > 0 ? Number(baseSalaryInput).toLocaleString() : ''}
+              placeholder="예: 300 (300만원)"
+              value={baseSalaryInput}
               onChange={(e) => {
                 const val = e.target.value.replace(/\D/g, '');
                 setBaseSalaryInput(val);
               }}
               onBlur={handleSalaryBlur}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-base font-extrabold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-lg font-extrabold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
-            <span className="absolute right-3 top-3 text-xs text-slate-400">원</span>
+            <span className="absolute right-3.5 top-3 text-sm font-bold text-indigo-400">
+              만원
+            </span>
           </div>
 
-          {/* Quick Add Buttons */}
+          {baseSalaryManwon > 0 && (
+            <div className="text-xs text-slate-400 mt-1 pl-1">
+              = {formatCompactKRW(baseSalaryManwon * 10000)}
+            </div>
+          )}
+
+          {/* Quick Step Buttons */}
           <div className="flex gap-1.5 mt-2">
-            {[100000, 500000, 1000000].map((addVal) => (
+            {[10, 50, 100].map((step) => (
               <button
-                key={addVal}
+                key={step}
                 type="button"
                 onClick={() => {
                   const current = parseInt(baseSalaryInput.replace(/\D/g, ''), 10) || 0;
-                  const next = current + addVal;
+                  const next = current + step;
                   setBaseSalaryInput(String(next));
-                  onUpdateConfig({ ...config, baseSalary: next, payday, rules });
+                  onUpdateConfig({ ...config, baseSalaryManwon: next, payday, deductions });
                 }}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition"
+                className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700 transition"
               >
-                +{formatCompactKRW(addVal)}
+                +{step}만
               </button>
             ))}
           </div>
         </div>
-
-        {/* Deal Budget Alert Banner */}
-        {config.baseSalary > 0 && dealRule ? (
-          <div className="bg-indigo-950/40 rounded-xl p-3 border border-indigo-500/30 flex items-start gap-2.5">
-            <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-            <div className="text-xs">
-              <div className="text-indigo-200 font-semibold">
-                {dealRule.name} 배분액: {formatKRW(dealBudget)} ({dealRule.ratio}%)
-              </div>
-              <p className="text-slate-400 mt-0.5">
-                이번 달 등록한 특가 플랜 ({formatKRW(currentPlannedDealsSpend)}) 대비{' '}
-                <strong className={remainingDealBudget >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                  {remainingDealBudget >= 0
-                    ? `${formatKRW(remainingDealBudget)} 여유가 있습니다.`
-                    : `${formatKRW(Math.abs(remainingDealBudget))} 초과되었습니다!`}
-                </strong>
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/40 text-xs text-slate-400 flex items-center gap-2">
-            <Info className="w-4 h-4 text-indigo-400 shrink-0" />
-            <span>월급을 입력하시면 각 항목별 예산이 자동으로 계산됩니다.</span>
-          </div>
-        )}
       </div>
 
-      {/* Distribution Rules List */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-1.5">
-            <h4 className="text-xs font-bold text-slate-300">카테고리별 분배율</h4>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                isRatioValid
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-              }`}
-            >
-              합계 {totalRatio}% {isRatioValid ? '(완벽)' : '(100%로 맞춰주세요)'}
+      {/* 2. Key Calculation Summary Bar */}
+      <div className="grid grid-cols-3 gap-2">
+        {/* Total Deductions */}
+        <div className="bg-slate-900/80 rounded-xl p-3 border border-slate-800 text-center">
+          <span className="text-[11px] text-slate-400 block mb-0.5">차감 합계</span>
+          <span className="text-base font-bold text-slate-200">
+            {totalDeductionsManwon}
+            <span className="text-xs font-normal ml-0.5">만</span>
+          </span>
+        </div>
+
+        {/* Spending Limit (한계 소비) */}
+        <div className="bg-indigo-950/40 rounded-xl p-3 border border-indigo-500/40 text-center relative overflow-hidden">
+          <span className="text-[11px] font-semibold text-indigo-300 block mb-0.5 flex items-center justify-center gap-1">
+            <ShoppingBag className="w-3 h-3" />
+            한계 소비
+          </span>
+          <span className="text-base font-extrabold text-indigo-400">
+            {spendingLimitManwon}
+            <span className="text-xs font-normal ml-0.5">만</span>
+          </span>
+        </div>
+
+        {/* Remaining Money (남은 금액) */}
+        <div
+          className={`rounded-xl p-3 border text-center ${
+            remainingManwon >= 0
+              ? 'bg-emerald-950/30 border-emerald-500/40'
+              : 'bg-rose-950/30 border-rose-500/40'
+          }`}
+        >
+          <span className="text-[11px] text-slate-400 block mb-0.5">남은 금액</span>
+          <span
+            className={`text-base font-extrabold ${
+              remainingManwon >= 0 ? 'text-emerald-400' : 'text-rose-400'
+            }`}
+          >
+            {remainingManwon}
+            <span className="text-xs font-normal ml-0.5">만</span>
+          </span>
+        </div>
+      </div>
+
+      {/* Spending Limit Alert vs Actual Plan Spend */}
+      {spendingLimitWon > 0 && (
+        <div className="bg-slate-900/80 rounded-xl p-3 border border-indigo-500/30 text-xs space-y-1">
+          <div className="flex items-center justify-between text-slate-300">
+            <span className="flex items-center gap-1 font-semibold text-indigo-300">
+              <ShoppingBag className="w-3.5 h-3.5 text-indigo-400" />
+              이번 달 플랜 소비 현황
+            </span>
+            <span className="font-bold text-white">
+              {formatCompactKRW(currentPlannedDealsSpend)} / {formatCompactKRW(spendingLimitWon)}
             </span>
           </div>
-
-          <button
-            onClick={handleAddRule}
-            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1"
-          >
-            <Plus className="w-3.5 h-3.5" /> 항목 추가
-          </button>
-        </div>
-
-        {/* Ratio Combined Progress Bar */}
-        <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden flex shadow-inner">
-          {rules.map((rule) => (
+          <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden mt-1">
             <div
-              key={rule.id}
+              className={`h-full rounded-full transition-all duration-300 ${
+                currentPlannedDealsSpend > spendingLimitWon
+                  ? 'bg-rose-500'
+                  : 'bg-indigo-500'
+              }`}
               style={{
-                width: `${rule.ratio}%`,
-                backgroundColor: rule.color
+                width: `${Math.min(100, Math.round((currentPlannedDealsSpend / spendingLimitWon) * 100))}%`
               }}
-              title={`${rule.name}: ${rule.ratio}%`}
-              className="h-full transition-all duration-300 first:rounded-l-full last:rounded-r-full"
             />
-          ))}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Quick Input Section (한 줄 퀵 추가) */}
+      <div className="bg-slate-900/80 rounded-2xl p-3.5 border border-slate-800 space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+            <Plus className="w-3.5 h-3.5 text-indigo-400" />
+            차감 항목 추가
+          </h4>
+          <span className="text-[11px] text-slate-400">
+            소비 항목은 플랜 한도로 잡힙니다
+          </span>
         </div>
 
-        {/* Cards for each rule */}
-        <div className="space-y-2.5">
-          {rules.map((rule) => {
-            const calculatedAmount = Math.round((config.baseSalary * rule.ratio) / 100);
+        {/* 한 줄 초고속 추가 */}
+        <form onSubmit={handleQuickAddOneLiner} className="flex gap-2">
+          <input
+            type="text"
+            value={quickOneLiner}
+            onChange={(e) => setQuickOneLiner(e.target.value)}
+            placeholder="예: ISA 100 또는 국민카드 40 소비"
+            className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+          />
+          <button
+            type="submit"
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shrink-0 transition active:scale-95 flex items-center gap-1"
+          >
+            <span>추가</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </form>
 
-            return (
-              <div
-                key={rule.id}
-                className="bg-slate-900/80 rounded-2xl p-3.5 border border-slate-800 space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: rule.color }}
-                    />
-                    <input
-                      type="text"
-                      value={rule.name}
-                      onChange={(e) => {
-                        const updated = rules.map((r) =>
-                          r.id === rule.id ? { ...r, name: e.target.value } : r
-                        );
-                        setRules(updated);
-                        onUpdateConfig({ ...config, rules: updated });
-                      }}
-                      className="bg-transparent text-sm font-bold text-white border-b border-transparent hover:border-slate-700 focus:border-indigo-500 focus:outline-none transition py-0.5"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-indigo-300">
-                      {formatCompactKRW(calculatedAmount)}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteRule(rule.id)}
-                      className="text-slate-600 hover:text-rose-400 p-1 transition"
-                      title="삭제"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Slider and Ratio Input */}
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={rule.ratio}
-                    onChange={(e) => handleRatioChange(rule.id, Number(e.target.value))}
-                    className="flex-1 accent-indigo-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
-                  />
-                  <div className="flex items-center gap-1 w-14 shrink-0">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={rule.ratio}
-                      onChange={(e) => handleRatioChange(rule.id, Number(e.target.value))}
-                      className="w-10 bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-0.5 text-xs text-center font-bold text-white focus:outline-none focus:border-indigo-500"
-                    />
-                    <span className="text-xs text-slate-400">%</span>
-                  </div>
-                </div>
-
-                {/* Description or memo */}
+        {/* 또는 상세 폼 */}
+        <div className="pt-1 border-t border-slate-800/80">
+          <form onSubmit={handleAddManual} className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="항목명 (예: ISA 저금)"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+              <div className="relative">
                 <input
                   type="text"
-                  placeholder="항목 설명 (예: 저축, 투자, 비상금)"
-                  value={rule.description || ''}
-                  onChange={(e) => {
-                    const updated = rules.map((r) =>
-                      r.id === rule.id ? { ...r, description: e.target.value } : r
-                    );
-                    setRules(updated);
-                    onUpdateConfig({ ...config, rules: updated });
-                  }}
-                  className="w-full bg-slate-950/40 text-[11px] text-slate-400 px-2 py-1 rounded-lg border border-slate-800 focus:outline-none focus:border-slate-700"
+                  inputMode="numeric"
+                  placeholder="금액"
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
+                <span className="absolute right-3 top-2 text-xs text-slate-400">만원</span>
               </div>
-            );
-          })}
+            </div>
+
+            <div className="flex items-center justify-between">
+              {/* Toggle Chip: 소비 vs 저축/고정 */}
+              <button
+                type="button"
+                onClick={() => setNewIsSpending(!newIsSpending)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+                  newIsSpending
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                {newIsSpending ? (
+                  <>
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>소비 예산 (플랜 한도 반영)</span>
+                  </>
+                ) : (
+                  <>
+                    <Landmark className="w-3.5 h-3.5" />
+                    <span>저축 / 고정 차감</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="submit"
+                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition active:scale-95"
+              >
+                + 직접 등록
+              </button>
+            </div>
+          </form>
         </div>
+
+        {/* Quick Presets */}
+        <div className="flex flex-wrap gap-1 pt-1">
+          {PRESET_NAMES.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => {
+                setNewName(preset);
+                if (preset.includes('카드') || preset.includes('생활')) {
+                  setNewIsSpending(true);
+                } else {
+                  setNewIsSpending(false);
+                }
+              }}
+              className="px-2 py-0.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[11px] border border-slate-800"
+            >
+              +{preset}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 4. Deductions List */}
+      <div className="space-y-2">
+        <h4 className="text-xs font-bold text-slate-300 px-1">
+          설정된 차감 목록 ({deductions.length}개)
+        </h4>
+
+        {deductions.length === 0 ? (
+          <div className="bg-slate-900/40 rounded-2xl p-6 border border-slate-800 text-center text-xs text-slate-400">
+            차감 항목이 없습니다. 상단에서 ISA 저금, 카드 소비 등을 등록해 보세요!
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {deductions.map((item) => (
+              <div
+                key={item.id}
+                className="bg-slate-900/80 rounded-2xl p-3 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-3"
+              >
+                {/* Left: Type tag & Name */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSpending(item.id)}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition shrink-0 ${
+                      item.isSpending
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
+                    }`}
+                    title="클릭하여 소비/저축 전환"
+                  >
+                    {item.isSpending ? (
+                      <>
+                        <ShoppingBag className="w-3 h-3" />
+                        <span>소비</span>
+                      </>
+                    ) : (
+                      <>
+                        <Landmark className="w-3 h-3" />
+                        <span>저축·고정</span>
+                      </>
+                    )}
+                  </button>
+
+                  <span className="text-sm font-semibold text-white truncate">
+                    {item.name}
+                  </span>
+                </div>
+
+                {/* Right: Amount & Step adjustment & Delete */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Step Buttons */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleStepAmount(item.id, -10)}
+                      className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-400"
+                      title="-10만원"
+                    >
+                      -10
+                    </button>
+                    <button
+                      onClick={() => handleStepAmount(item.id, 10)}
+                      className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-400"
+                      title="+10만원"
+                    >
+                      +10
+                    </button>
+                  </div>
+
+                  {/* Amount display / inline edit */}
+                  <div className="flex items-center gap-0.5">
+                    <input
+                      type="number"
+                      value={item.amountManwon}
+                      onChange={(e) => handleAmountChange(item.id, parseInt(e.target.value, 10) || 0)}
+                      className="w-14 bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-1 text-xs text-center font-bold text-white focus:outline-none focus:border-indigo-500"
+                    />
+                    <span className="text-xs text-slate-400">만</span>
+                  </div>
+
+                  {/* Delete button */}
+                  <button
+                    onClick={() => handleDeleteItem(item.id)}
+                    className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition"
+                    title="삭제"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
