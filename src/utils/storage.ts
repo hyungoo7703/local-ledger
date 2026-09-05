@@ -82,12 +82,54 @@ export function exportBackupJson(state: AppState): string {
 }
 
 export function importBackupJson(jsonStr: string): AppState {
-  const parsed = JSON.parse(jsonStr) as AppState;
-  if (!Array.isArray(parsed.deals) || !parsed.salaryConfig?.deductions) {
-    throw new Error('유효하지 않은 가계부 백업 데이터 형식입니다.');
+  let parsed: any;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    throw new Error('올바른 JSON 데이터 형식이 아닙니다.');
   }
-  saveAppState(parsed);
-  return parsed;
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('유효하지 않은 가계부 백업 데이터입니다.');
+  }
+
+  // 1. Deals 복원
+  const deals = Array.isArray(parsed.deals) ? parsed.deals : [];
+
+  // 2. SalaryConfig 복원 (만원 단위 월급, 차감 룰, 고정 체크리스트 완벽 복원)
+  const salaryConfig: SalaryConfig = {
+    baseSalaryManwon: Number(parsed.salaryConfig?.baseSalaryManwon) || 0,
+    payday: Number(parsed.salaryConfig?.payday) || 25,
+    deductions: Array.isArray(parsed.salaryConfig?.deductions)
+      ? parsed.salaryConfig.deductions.map((d: any) => ({
+          id: String(d.id || Date.now() + Math.random()),
+          name: String(d.name || '차감 항목'),
+          amountManwon: Number(d.amountManwon) || 0,
+          isSpending: Boolean(d.isSpending)
+        }))
+      : [],
+    checklist: Array.isArray(parsed.salaryConfig?.checklist)
+      ? parsed.salaryConfig.checklist.map((c: any) => ({
+          id: String(c.id || Date.now() + Math.random()),
+          title: String(c.title || ''),
+          isChecked: Boolean(c.isChecked)
+        }))
+      : []
+  };
+
+  // 3. QuickTags 복원
+  const quickTags = Array.isArray(parsed.quickTags) && parsed.quickTags.length > 0
+    ? parsed.quickTags
+    : DEFAULT_QUICK_TAGS;
+
+  const importedState: AppState = {
+    deals,
+    salaryConfig,
+    quickTags
+  };
+
+  saveAppState(importedState);
+  return importedState;
 }
 
 export function resetToDefault(): AppState {

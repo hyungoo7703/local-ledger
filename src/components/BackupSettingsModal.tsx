@@ -80,12 +80,12 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
     }
   };
 
-  // Reset to default
+  // Complete Reset
   const handleReset = () => {
-    if (window.confirm('정말로 모든 데이터를 초기 예시 데이터로 초기화하시겠습니까? (현재 데이터는 삭제됩니다)')) {
+    if (window.confirm('정말로 모든 데이터(소비 플랜, 월급 및 차감 룰, 고정 체크리스트)를 완전히 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
       const reset = resetToDefault();
       onStateChange(reset);
-      alert('초기화되었습니다.');
+      alert('모든 데이터가 완전히 초기화되었습니다.');
     }
   };
 
@@ -210,7 +210,7 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
           className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-950/30 hover:bg-rose-950/60 border border-rose-900/40 text-xs font-semibold text-rose-400 transition"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          <span>기본 예시 데이터로 초기화</span>
+          <span>가계부 데이터 완전 초기화</span>
         </button>
       </div>
     </div>
