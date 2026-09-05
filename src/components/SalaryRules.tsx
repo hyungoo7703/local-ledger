@@ -11,7 +11,7 @@ interface SalaryRulesProps {
 }
 
 const PRESET_NAMES = ['ISA 저금', '청약 저축', '국민카드', '신한카드', '고정지출(월세/공과)', '비상금'];
-const CHECKLIST_PRESETS = ['월세 송금', '관리비 납부', '청약 입금', 'ISA 저축', '카드대금 결제'];
+const CHECKLIST_PRESETS = ['월세 송금', '관리비 납부', '청약 입금', 'ISA 저축', '적금 이체', '보험료 납부'];
 
 export const SalaryRules: React.FC<SalaryRulesProps> = ({
   config,
@@ -180,13 +180,15 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
 
   const handleImportFromDeductions = () => {
     const existingTitles = new Set(checklist.map((c) => c.title));
+    // 소비 항목(카드소비 등)은 제외하고 순수 고정 및 저축 차감 항목만 가져옴
     const toAdd = deductions
+      .filter((d) => !d.isSpending)
       .map((d) => d.name)
       .filter((name) => !existingTitles.has(name))
       .map((name) => ({ id: generateId(), title: name, isChecked: false }));
 
     if (toAdd.length === 0) {
-      alert('이미 모든 차감 항목이 체크리스트에 추가되어 있습니다.');
+      alert('가져올 저축/고정 항목이 없거나 이미 모두 등록되어 있습니다. (소비 항목은 제외됩니다)');
       return;
     }
     const updated = [...checklist, ...toAdd];
@@ -643,19 +645,21 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
             {/* Modal Body (Scrollable) */}
             <div className="flex-1 overflow-y-auto space-y-3 pt-3">
               <p className="text-xs text-slate-400 leading-relaxed">
-                월세, 청약, 관리비 납부를 체크하고 새 달에는 '전체 해제'로 새로 시작합니다.
+                소비를 제외한 월세, 청약, 적금, 공과금 납부를 체크하고 새 달에는 '전체 해제'로 새로 시작합니다.
               </p>
 
-              {/* 차감 항목에서 가져오기 버튼 */}
-              {deductions.length > 0 && (
+              {/* 차감 항목에서 가져오기 버튼 (소비 항목 제외) */}
+              {deductions.filter((d) => !d.isSpending).length > 0 && (
                 <div className="flex items-center justify-between bg-slate-800/40 p-2.5 rounded-xl border border-slate-800 text-xs gap-2">
-                  <span className="text-slate-400 text-[11px]">차감 룰 항목을 복사할 수 있습니다.</span>
+                  <span className="text-slate-400 text-[11px]">
+                    고정·저축 차감 항목을 가져올 수 있습니다.
+                  </span>
                   <button
                     type="button"
                     onClick={handleImportFromDeductions}
                     className="px-2.5 py-1 bg-indigo-600/30 hover:bg-indigo-600/40 text-indigo-300 font-medium rounded-lg text-[11px] border border-indigo-500/30 transition shrink-0 whitespace-nowrap"
                   >
-                    + 차감 항목 가져오기
+                    + 고정·저축 항목 가져오기
                   </button>
                 </div>
               )}
