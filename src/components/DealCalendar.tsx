@@ -54,7 +54,7 @@ export const DealCalendar: React.FC<DealCalendarProps> = ({
     const isToday = dayStr === todayStr;
     const isSelected = dayStr === selectedDate;
     const hasDeals = dayDeals.length > 0;
-    const totalDiscount = dayDeals.reduce((sum, item) => sum + item.discountAmount, 0);
+    const totalBenefit = dayDeals.reduce((sum, item) => sum + (item.benefitAmount || 0), 0);
 
     cells.push(
       <button
@@ -91,13 +91,13 @@ export const DealCalendar: React.FC<DealCalendarProps> = ({
           )}
         </div>
 
-        {/* Deals Indicator / Discount preview */}
+        {/* Deals Indicator / Benefit preview */}
         {hasDeals ? (
           <div className="w-full px-0.5 mt-auto">
-            {totalDiscount > 0 ? (
+            {totalBenefit > 0 ? (
               <div className="text-[9px] font-bold text-pink-400 truncate flex items-center justify-center gap-0.5 bg-pink-950/40 rounded py-0.5 border border-pink-500/20">
                 <Sparkles className="w-2.5 h-2.5 shrink-0" />
-                <span>-{Math.round(totalDiscount / 1000)}k</span>
+                <span>+{Math.round(totalBenefit / 1000)}k</span>
               </div>
             ) : (
               <div className="text-[9px] font-medium text-indigo-300 truncate text-center bg-indigo-950/40 rounded py-0.5">

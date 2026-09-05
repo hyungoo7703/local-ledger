@@ -42,9 +42,21 @@ export const App: React.FC = () => {
     return currentMonthDeals.reduce((sum, d) => sum + d.finalPrice, 0);
   }, [currentMonthDeals]);
 
-  const totalDiscountSaved = useMemo(() => {
-    return currentMonthDeals.reduce((sum, d) => sum + d.discountAmount, 0);
+  const billDiscountTotal = useMemo(() => {
+    return currentMonthDeals
+      .filter((d) => d.benefitType === 'bill_discount')
+      .reduce((sum, d) => sum + (d.benefitAmount || 0), 0);
   }, [currentMonthDeals]);
+
+  const pointRewardTotal = useMemo(() => {
+    return currentMonthDeals
+      .filter((d) => d.benefitType === 'point_reward')
+      .reduce((sum, d) => sum + (d.benefitAmount || 0), 0);
+  }, [currentMonthDeals]);
+
+  const totalPostBenefits = useMemo(() => {
+    return billDiscountTotal + pointRewardTotal;
+  }, [billDiscountTotal, pointRewardTotal]);
 
   const completedCount = useMemo(() => {
     return currentMonthDeals.filter((d) => d.isCompleted).length;
@@ -141,10 +153,12 @@ export const App: React.FC = () => {
             {/* Top Monthly Stats summary */}
             <StatsCard
               totalPlannedSpend={totalPlannedSpend}
-              totalDiscountSaved={totalDiscountSaved}
+              totalPostBenefits={totalPostBenefits}
+              billDiscountTotal={billDiscountTotal}
+              pointRewardTotal={pointRewardTotal}
               completedCount={completedCount}
               totalCount={currentMonthDeals.length}
-              dealBudget={spendingLimitWon}
+              baseBudgetWon={spendingLimitWon}
             />
 
             {/* Calendar Grid */}
@@ -177,6 +191,7 @@ export const App: React.FC = () => {
           <SalaryRules
             config={appState.salaryConfig}
             currentPlannedDealsSpend={totalPlannedSpend}
+            totalPostBenefits={totalPostBenefits}
             onUpdateConfig={handleUpdateSalaryConfig}
           />
         )}

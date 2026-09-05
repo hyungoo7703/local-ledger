@@ -1,74 +1,118 @@
 import React from 'react';
-import { TrendingDown, Sparkles, CheckCircle2, Wallet } from 'lucide-react';
+import { TrendingDown, Sparkles, CheckCircle2, Wallet, CreditCard, Coins } from 'lucide-react';
 import { formatCompactKRW, formatKRW } from '../utils/formatters';
 
 interface StatsCardProps {
-  totalPlannedSpend: number;
-  totalDiscountSaved: number;
+  totalPlannedSpend: number; // 실제 결제(승인) 예정 총액 (원)
+  totalPostBenefits: number; // 사후 혜택 총액 (청구할인 + 적립) (원)
+  billDiscountTotal: number; // 결제일 청구할인 합계 (원)
+  pointRewardTotal: number; // 포인트/캐시백 적립 합계 (원)
   completedCount: number;
   totalCount: number;
-  dealBudget: number; // 월급 룰에서 할당된 혜택 소비 예산
+  baseBudgetWon: number; // 월급 룰에서 할당된 기본 한계 소비 예산 (원)
 }
 
 export const StatsCard: React.FC<StatsCardProps> = ({
   totalPlannedSpend,
-  totalDiscountSaved,
+  totalPostBenefits,
+  billDiscountTotal,
+  pointRewardTotal,
   completedCount,
   totalCount,
-  dealBudget
+  baseBudgetWon
 }) => {
-  const budgetRatio = dealBudget > 0 ? Math.min(100, Math.round((totalPlannedSpend / dealBudget) * 100)) : 0;
-  const isOverBudget = dealBudget > 0 && totalPlannedSpend > dealBudget;
-  const remainingBudget = dealBudget - totalPlannedSpend;
+  // 사후 혜택(청구할인, 포인트적립)이 발생하면 한계 소비 예산이 늘어남
+  const adjustedBudgetWon = baseBudgetWon + totalPostBenefits;
+  const netSpend = Math.max(0, totalPlannedSpend - totalPostBenefits);
+  const remainingBudgetWon = adjustedBudgetWon - totalPlannedSpend;
+  const isOverBudget = adjustedBudgetWon > 0 && totalPlannedSpend > adjustedBudgetWon;
+  const budgetRatio = adjustedBudgetWon > 0
+    ? Math.min(100, Math.round((totalPlannedSpend / adjustedBudgetWon) * 100))
+    : 0;
 
   return (
     <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 rounded-2xl p-4 border border-slate-800 shadow-xl space-y-3">
-      {/* Top row: Planned Spend & Saved Discount */}
+      {/* Top row: Planned Spend & Post Benefits */}
       <div className="grid grid-cols-2 gap-3">
-        {/* Planned Spend */}
-        <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/40 relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-            <span className="font-medium">예정 지출</span>
-            <Wallet className="w-3.5 h-3.5 text-indigo-400" />
+        {/* Planned Spend Card */}
+        <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/40 relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+              <span className="font-medium">결제(승인) 예정액</span>
+              <Wallet className="w-3.5 h-3.5 text-indigo-400" />
+            </div>
+            <div className="text-lg font-bold text-white tracking-tight">
+              {formatCompactKRW(totalPlannedSpend)}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              승인: {formatKRW(totalPlannedSpend)}
+            </div>
           </div>
-          <div className="text-lg font-bold text-white tracking-tight">
-            {formatCompactKRW(totalPlannedSpend)}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
-            {formatKRW(totalPlannedSpend)}
-          </div>
+
+          {totalPostBenefits > 0 && (
+            <div className="mt-2 pt-1.5 border-t border-slate-700/50 text-[11px] text-indigo-300 font-medium truncate">
+              실질 순소비: <strong>{formatKRW(netSpend)}</strong>
+            </div>
+          )}
         </div>
 
-        {/* Saved Discount */}
-        <div className="bg-gradient-to-br from-indigo-950/60 to-pink-950/40 rounded-xl p-3 border border-indigo-500/30 relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-pink-300 mb-1">
-            <span className="font-medium flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-              할인 세이브
-            </span>
-            <TrendingDown className="w-3.5 h-3.5 text-emerald-400" />
+        {/* Post Benefits Card (청구할인 + 적립) */}
+        <div className="bg-gradient-to-br from-indigo-950/60 via-slate-900 to-pink-950/40 rounded-xl p-3 border border-indigo-500/30 relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-xs text-pink-300 mb-1">
+              <span className="font-medium flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                사후 혜택 (청구+적립)
+              </span>
+              <TrendingDown className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
+            <div className="text-lg font-extrabold text-pink-400 tracking-tight">
+              +{formatCompactKRW(totalPostBenefits)}
+            </div>
+            <div className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <span className="flex items-center gap-0.5 text-emerald-300">
+                <CreditCard className="w-3 h-3" />
+                {formatCompactKRW(billDiscountTotal)}
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-0.5 text-pink-300">
+                <Coins className="w-3 h-3" />
+                {formatCompactKRW(pointRewardTotal)}
+              </span>
+            </div>
           </div>
-          <div className="text-lg font-extrabold text-pink-400 tracking-tight">
-            +{formatCompactKRW(totalDiscountSaved)}
-          </div>
-          <div className="text-[11px] text-emerald-400/90 font-medium mt-0.5">
-            총 {formatKRW(totalDiscountSaved)} 절약!
-          </div>
+
+          {totalPostBenefits > 0 && (
+            <div className="mt-2 pt-1.5 border-t border-pink-500/20 text-[11px] text-emerald-400 font-semibold truncate">
+              ✨ 한계 예산 +{formatCompactKRW(totalPostBenefits)} 확대!
+            </div>
+          )}
         </div>
       </div>
 
       {/* Budget Bar & Progress */}
-      {dealBudget > 0 && (
-        <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-800 text-xs space-y-1.5">
-          <div className="flex justify-between items-center text-slate-300">
-            <span className="text-slate-400">
-              한계 소비 예산 대비 ({formatCompactKRW(dealBudget)})
-            </span>
+      {baseBudgetWon > 0 && (
+        <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-800 text-xs space-y-2">
+          <div className="flex justify-between items-center text-slate-300 flex-wrap gap-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-slate-400">한계 예산:</span>
+              <span className="text-slate-300">{formatCompactKRW(baseBudgetWon)}</span>
+              {totalPostBenefits > 0 && (
+                <span className="text-emerald-400 font-semibold">
+                  (+{formatCompactKRW(totalPostBenefits)} 혜택)
+                </span>
+              )}
+              <span className="text-indigo-300 font-bold">
+                = {formatCompactKRW(adjustedBudgetWon)}
+              </span>
+            </div>
+
             <span className={`font-semibold ${isOverBudget ? 'text-rose-400' : 'text-indigo-300'}`}>
-              {budgetRatio}% ({isOverBudget ? '초과' : `${formatCompactKRW(remainingBudget)} 남음`})
+              {budgetRatio}% ({isOverBudget ? '예산 초과' : `${formatCompactKRW(remainingBudgetWon)} 남음`})
             </span>
           </div>
-          <div className="w-full bg-slate-700/60 rounded-full h-2 overflow-hidden">
+
+          <div className="w-full bg-slate-700/60 rounded-full h-2.5 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 isOverBudget

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Sparkles, Plus, Calendar, Tag, Check, ArrowRight } from 'lucide-react';
+import { X, Sparkles, Plus, Calendar, Tag, Check, ArrowRight, CreditCard, Coins, ShoppingBag } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { DealItem } from '../types';
-import { generateId, getTodayString } from '../utils/formatters';
+import { DealItem, BenefitType } from '../types';
+import { generateId, getTodayString, formatKRW } from '../utils/formatters';
 import { parseQuickEntry } from '../utils/parser';
 
 interface QuickAddModalProps {
@@ -34,7 +34,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [date, setDate] = useState('');
   const [title, setTitle] = useState('');
   const [finalPrice, setFinalPrice] = useState<string>('');
-  const [discountAmount, setDiscountAmount] = useState<string>('');
+  const [benefitType, setBenefitType] = useState<BenefitType>('instant');
+  const [benefitAmount, setBenefitAmount] = useState<string>('');
   const [dealTag, setDealTag] = useState('기타');
   const [memo, setMemo] = useState('');
   const [isNewTagInputOpen, setIsNewTagInputOpen] = useState(false);
@@ -49,7 +50,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         setDate(editItem.date);
         setTitle(editItem.title);
         setFinalPrice(editItem.finalPrice ? String(editItem.finalPrice) : '');
-        setDiscountAmount(editItem.discountAmount ? String(editItem.discountAmount) : '');
+        setBenefitType(editItem.benefitType || 'instant');
+        setBenefitAmount(editItem.benefitAmount ? String(editItem.benefitAmount) : '');
         setDealTag(editItem.dealTag || '기타');
         setMemo(editItem.memo || '');
         setQuickText('');
@@ -58,8 +60,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         setDate(defaultDate);
         setTitle('');
         setFinalPrice('');
-        setDiscountAmount('');
-        setDealTag(quickTags[0] || '배민');
+        setBenefitType('instant');
+        setBenefitAmount('');
+        setDealTag(quickTags[0] || '삼성LINK');
         setMemo('');
         setQuickText('');
         // Focus quick input automatically on mobile/desktop
@@ -83,7 +86,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     if (parsed.date) setDate(parsed.date);
     if (parsed.title) setTitle(parsed.title);
     if (parsed.finalPrice > 0) setFinalPrice(String(parsed.finalPrice));
-    if (parsed.discountAmount > 0) setDiscountAmount(String(parsed.discountAmount));
+    setBenefitType(parsed.benefitType);
+    if (parsed.benefitAmount > 0) {
+      setBenefitAmount(String(parsed.benefitAmount));
+    } else {
+      setBenefitAmount('');
+    }
     if (parsed.dealTag) setDealTag(parsed.dealTag);
   };
 
@@ -93,7 +101,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     // 만약 한 줄 입력만 적고 바로 등록 버튼을 누른 경우 자동 파싱
     let finalTitle = title.trim();
     let finalPaid = parseInt(finalPrice.replace(/,/g, ''), 10) || 0;
-    let finalDiscount = parseInt(discountAmount.replace(/,/g, ''), 10) || 0;
+    let finalType: BenefitType = benefitType;
+    let finalBenefit = parseInt(benefitAmount.replace(/,/g, ''), 10) || 0;
     let finalTargetDate = date || getTodayString();
     let finalSelectedTag = dealTag;
 
@@ -101,7 +110,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       const parsed = parseQuickEntry(quickText, currentYear, currentMonth);
       finalTitle = parsed.title;
       if (parsed.finalPrice > 0) finalPaid = parsed.finalPrice;
-      if (parsed.discountAmount > 0) finalDiscount = parsed.discountAmount;
+      finalType = parsed.benefitType;
+      if (parsed.benefitAmount > 0) finalBenefit = parsed.benefitAmount;
       if (parsed.date) finalTargetDate = parsed.date;
       if (parsed.dealTag) finalSelectedTag = parsed.dealTag;
     }
@@ -110,12 +120,17 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       finalTitle = '소비/혜택 플랜';
     }
 
+    if (finalType === 'instant') {
+      finalBenefit = 0;
+    }
+
     const item: DealItem = {
       id: editItem ? editItem.id : generateId(),
       date: finalTargetDate,
       title: finalTitle,
       finalPrice: finalPaid,
-      discountAmount: finalDiscount,
+      benefitType: finalType,
+      benefitAmount: finalBenefit,
       dealTag: finalSelectedTag,
       memo: memo.trim(),
       isCompleted: editItem ? editItem.isCompleted : false,
@@ -124,8 +139,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
 
     onSave(item);
 
-    // 할인 혜택이 있을 때 경쾌한 폭죽 효과
-    if (finalDiscount > 0) {
+    // 사후 혜택이 있을 때 경쾌한 폭죽 효과
+    if (finalBenefit > 0) {
       confetti({
         particleCount: 50,
         spread: 60,
@@ -145,6 +160,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       setIsNewTagInputOpen(false);
     }
   };
+
+  const parsedPaid = parseInt(finalPrice.replace(/,/g, ''), 10) || 0;
+  const parsedBenefit = parseInt(benefitAmount.replace(/,/g, ''), 10) || 0;
+  const netSpend = Math.max(0, parsedPaid - parsedBenefit);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -268,48 +287,138 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             />
           </div>
 
-          {/* Prices row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">
-                결제 예정액 (내가 낼 돈)
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="0"
-                  value={finalPrice ? Number(finalPrice).toLocaleString() : ''}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, '');
-                    setFinalPrice(raw);
-                  }}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-                <span className="absolute right-3 top-2.5 text-xs text-slate-400">원</span>
-              </div>
+          {/* Checkout (finalPrice) Amount */}
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1">
+              실제 결제(승인) 금액 <span className="text-[11px] text-slate-400">(원 단위)</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                required
+                placeholder="예: 12,000"
+                value={finalPrice ? Number(finalPrice).toLocaleString() : ''}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, '');
+                  setFinalPrice(raw);
+                }}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-base font-bold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+              <span className="absolute right-3.5 top-3 text-xs font-semibold text-slate-400">원</span>
             </div>
+            <p className="text-[11px] text-slate-400 mt-1 pl-1">
+              카드 결제창 또는 매장에서 긁을 최종 결제 금액입니다.
+            </p>
+          </div>
 
-            <div>
-              <label className="block text-xs font-medium text-pink-400 mb-1 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> 할인/아낀 금액 (세이브)
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="0"
-                  value={discountAmount ? Number(discountAmount).toLocaleString() : ''}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, '');
-                    setDiscountAmount(raw);
-                  }}
-                  className="w-full bg-slate-800 border border-pink-500/40 rounded-xl px-3 py-2 text-sm font-semibold text-pink-400 placeholder-slate-500 focus:outline-none focus:border-pink-500"
-                />
-                <span className="absolute right-3 top-2.5 text-xs text-pink-400/80">원</span>
-              </div>
+          {/* Benefit Type Selection (3 Modes) */}
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+              할인 및 혜택 유형
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {/* Instant discount */}
+              <button
+                type="button"
+                onClick={() => setBenefitType('instant')}
+                className={`p-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
+                  benefitType === 'instant'
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span className="text-center text-[11px] leading-tight">즉시할인 / 일반</span>
+              </button>
+
+              {/* Bill discount (삼성LINK, 청구할인 등) */}
+              <button
+                type="button"
+                onClick={() => setBenefitType('bill_discount')}
+                className={`p-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
+                  benefitType === 'bill_discount'
+                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <CreditCard className="w-4 h-4" />
+                <span className="text-center text-[11px] leading-tight">결제일 청구할인</span>
+              </button>
+
+              {/* Point reward (Tday 적립, 캐시백 등) */}
+              <button
+                type="button"
+                onClick={() => setBenefitType('point_reward')}
+                className={`p-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
+                  benefitType === 'point_reward'
+                    ? 'bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/30'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <Coins className="w-4 h-4" />
+                <span className="text-center text-[11px] leading-tight">포인트/캐시백 적립</span>
+              </button>
             </div>
           </div>
+
+          {/* Conditional Benefit Amount Input (for bill_discount or point_reward) */}
+          {benefitType !== 'instant' && (
+            <div className="space-y-2 bg-slate-800/50 p-3 rounded-2xl border border-slate-700/80">
+              <label className="block text-xs font-semibold text-white flex items-center gap-1">
+                {benefitType === 'bill_discount' ? (
+                  <>
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>결제일 청구할인 예정액 (원 단위)</span>
+                  </>
+                ) : (
+                  <>
+                    <Coins className="w-3.5 h-3.5 text-pink-400" />
+                    <span>적립 예정 금액 (포인트/캐시백)</span>
+                  </>
+                )}
+              </label>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="예: 2,000 또는 24,000"
+                  value={benefitAmount ? Number(benefitAmount).toLocaleString() : ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    setBenefitAmount(raw);
+                  }}
+                  className={`w-full bg-slate-900 border rounded-xl px-3.5 py-2.5 text-sm font-bold placeholder-slate-500 focus:outline-none ${
+                    benefitType === 'bill_discount'
+                      ? 'border-emerald-500/50 text-emerald-300 focus:border-emerald-400'
+                      : 'border-pink-500/50 text-pink-300 focus:border-pink-400'
+                  }`}
+                />
+                <span className="absolute right-3.5 top-3 text-xs text-slate-400">원</span>
+              </div>
+
+              {/* Dynamic Feedback Banner */}
+              {parsedBenefit > 0 && (
+                <div
+                  className={`p-2.5 rounded-xl text-xs flex flex-col gap-1 border ${
+                    benefitType === 'bill_discount'
+                      ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
+                      : 'bg-pink-950/40 border-pink-500/30 text-pink-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-bold">
+                    <span>✨ 한계 소비 예산 확대 효과:</span>
+                    <span>+{formatKRW(parsedBenefit)}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-300">
+                    결제 {formatKRW(parsedPaid)} - 혜택 {formatKRW(parsedBenefit)} = 실질 지출{' '}
+                    <strong className="text-white underline">{formatKRW(netSpend)}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Quick Tag Chips */}
           <div>

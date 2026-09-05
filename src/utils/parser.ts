@@ -1,12 +1,16 @@
+import { BenefitType } from '../types';
+
 export interface ParsedEntry {
   date?: string;
   title: string;
   finalPrice: number;
-  discountAmount: number;
+  benefitType: BenefitType;
+  benefitAmount: number;
   dealTag: string;
 }
 
 const COMMON_TAGS = [
+  '삼성LINK', '신한Tops', 'Tday', 'T-day', 'LINK', 'Tops',
   '네이버페이', '배민', '요기요', '쿠팡', '올영', '올리브영',
   '통신사', 'SKT', 'KT', 'LGU+', '스타벅스', '버거킹',
   '맥도날드', 'GS25', 'CU', '토스', '신한', 'KB', '현대', '삼성'
@@ -15,10 +19,9 @@ const COMMON_TAGS = [
 /**
  * 자연어 한 줄 입력 파서
  * 예시 입력:
- * - "15일 와퍼세트 6900 배민할인 3000"
- * - "20일 올영 샴푸 15000 올영세일 5000"
- * - "치킨 18000 요기요 -4000"
- * - "버거킹 8000"
+ * - "15일 멸치국수 12000 삼성LINK 청구할인 2000"
+ * - "20일 빕스 60000 Tday 적립 24000"
+ * - "버거킹 15000 Tops쿠폰"
  */
 export function parseQuickEntry(
   rawInput: string,
@@ -27,7 +30,21 @@ export function parseQuickEntry(
 ): ParsedEntry {
   let text = rawInput.trim();
   if (!text) {
-    return { title: '', finalPrice: 0, discountAmount: 0, dealTag: '기타' };
+    return {
+      title: '',
+      finalPrice: 0,
+      benefitType: 'instant',
+      benefitAmount: 0,
+      dealTag: '기타'
+    };
+  }
+
+  // 혜택 유형 감지
+  let benefitType: BenefitType = 'instant';
+  if (/적립|캐시백|포인트|페이백/i.test(text)) {
+    benefitType = 'point_reward';
+  } else if (/청구|결제일|LINK|링크/i.test(text)) {
+    benefitType = 'bill_discount';
   }
 
   // 1. 날짜 추출 (예: "15일", "3일", 또는 맨 앞의 숫자 1~31)
@@ -41,17 +58,20 @@ export function parseQuickEntry(
     }
   }
 
-  // 2. 할인 금액 명시 패턴 추출 (예: "할인 3000", "3000원 할인", "할인3000", "-3000")
-  let discountAmount = 0;
-  const explicitDiscountMatch = text.match(/(?:할인\s*[:=]?\s*|-)(\d+(?:,\d{3})*|\d+만)(?:원)?/i)
-    || text.match(/(\d+(?:,\d{3})*|\d+만)(?:원)?\s*할인/i);
+  // 2. 할인/적립 금액 명시 패턴 추출 (예: "청구할인 2000", "적립 24000", "할인 3000", "-3000")
+  let benefitAmount = 0;
+  const explicitBenefitMatch = text.match(/(?:청구할인|결제일할인|적립|캐시백|할인\s*[:=]?\s*|-)(\d+(?:,\d{3})*|\d+만)(?:원)?/i)
+    || text.match(/(\d+(?:,\d{3})*|\d+만)(?:원)?\s*(?:청구할인|적립|캐시백|할인)/i);
 
-  if (explicitDiscountMatch) {
-    discountAmount = parseAmount(explicitDiscountMatch[1]);
-    text = text.replace(explicitDiscountMatch[0], ' ').trim();
+  if (explicitBenefitMatch) {
+    benefitAmount = parseAmount(explicitBenefitMatch[1]);
+    if (benefitType === 'instant' && !/즉시|쿠폰/.test(explicitBenefitMatch[0])) {
+      benefitType = 'bill_discount';
+    }
+    text = text.replace(explicitBenefitMatch[0], ' ').trim();
   }
 
-  // 3. 태그 추출 (일치하는 공통 태그 찾기)
+  // 3. 태그 추출
   let dealTag = '';
   for (const tag of COMMON_TAGS) {
     const regex = new RegExp(`(^|\\s)(${tag})(\\s|$)`, 'i');
@@ -62,27 +82,25 @@ export function parseQuickEntry(
     }
   }
 
-  // 4. 남은 숫자들 추출 (결제 금액 및 남은 할인금액 처리)
+  // 4. 남은 숫자들 추출 (결제 금액 및 남은 혜택금액 처리)
   const numberMatches = Array.from(text.matchAll(/(\d+(?:,\d{3})*|\d+만)(?:원)?/g));
   let finalPrice = 0;
 
   if (numberMatches.length > 0) {
-    // 숫자가 2개 이상이고 아직 할인금액이 안 잡혔다면, 첫 번째는 결제금액, 두 번째는 할인금액일 가능성
-    if (numberMatches.length >= 2 && discountAmount === 0) {
+    if (numberMatches.length >= 2 && benefitAmount === 0) {
       const p1 = parseAmount(numberMatches[0][1]);
       const p2 = parseAmount(numberMatches[1][1]);
       finalPrice = p1;
-      discountAmount = p2;
-      // 텍스트에서 두 숫자 제거
+      benefitAmount = p2;
+      if (benefitType === 'instant') benefitType = 'bill_discount';
       text = text.replace(numberMatches[0][0], ' ').replace(numberMatches[1][0], ' ').trim();
     } else {
-      // 숫자 1개인 경우 -> 결제 금액
       finalPrice = parseAmount(numberMatches[0][1]);
       text = text.replace(numberMatches[0][0], ' ').trim();
     }
   }
 
-  // 5. 남은 텍스트는 제목/품목
+  // 5. 남은 텍스트는 제목
   let title = text.replace(/\s+/g, ' ').trim();
   if (!title && dealTag) {
     title = dealTag;
@@ -90,7 +108,6 @@ export function parseQuickEntry(
     title = '쇼핑/지출 플랜';
   }
 
-  // 날짜 조합
   let formattedDate: string | undefined;
   if (extractedDay !== null) {
     formattedDate = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(extractedDay).padStart(2, '0')}`;
@@ -100,7 +117,8 @@ export function parseQuickEntry(
     date: formattedDate,
     title,
     finalPrice,
-    discountAmount,
+    benefitType: benefitAmount > 0 ? benefitType : 'instant',
+    benefitAmount,
     dealTag: dealTag || '기타'
   };
 }

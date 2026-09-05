@@ -7,6 +7,7 @@ import { calculateRemainingSalary, calculateSpendingLimitManwon, calculateTotalD
 interface SalaryRulesProps {
   config: SalaryConfig;
   currentPlannedDealsSpend: number; // in KRW (원)
+  totalPostBenefits?: number; // in KRW (원) 사후 혜택 총액
   onUpdateConfig: (newConfig: SalaryConfig) => void;
 }
 
@@ -16,6 +17,7 @@ const CHECKLIST_PRESETS = ['월세 송금', '관리비 납부', '청약 입금',
 export const SalaryRules: React.FC<SalaryRulesProps> = ({
   config,
   currentPlannedDealsSpend,
+  totalPostBenefits = 0,
   onUpdateConfig
 }) => {
   const [baseSalaryInput, setBaseSalaryInput] = useState<string>(
@@ -337,25 +339,35 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
 
       {/* Spending Limit Alert vs Actual Plan Spend */}
       {spendingLimitWon > 0 && (
-        <div className="bg-slate-900/80 rounded-xl p-3 border border-indigo-500/30 text-xs space-y-1">
+        <div className="bg-slate-900/80 rounded-xl p-3 border border-indigo-500/30 text-xs space-y-1.5">
           <div className="flex items-center justify-between text-slate-300">
             <span className="flex items-center gap-1 font-semibold text-indigo-300">
               <ShoppingBag className="w-3.5 h-3.5 text-indigo-400" />
               이번 달 플랜 소비 현황
             </span>
-            <span className="font-bold text-white">
-              {formatCompactKRW(currentPlannedDealsSpend)} / {formatCompactKRW(spendingLimitWon)}
-            </span>
+            <div className="text-right">
+              <span className="font-bold text-white">
+                {formatCompactKRW(currentPlannedDealsSpend)}
+              </span>
+              <span className="text-slate-400 text-[11px] ml-1">
+                / {formatCompactKRW(spendingLimitWon + totalPostBenefits)}
+              </span>
+            </div>
           </div>
+          {totalPostBenefits > 0 && (
+            <div className="text-[11px] text-emerald-400 font-medium">
+              ✨ 사후 혜택 +{formatCompactKRW(totalPostBenefits)} 반영으로 한계 예산 확대됨
+            </div>
+          )}
           <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden mt-1">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
-                currentPlannedDealsSpend > spendingLimitWon
+                currentPlannedDealsSpend > (spendingLimitWon + totalPostBenefits)
                   ? 'bg-rose-500'
                   : 'bg-indigo-500'
               }`}
               style={{
-                width: `${Math.min(100, Math.round((currentPlannedDealsSpend / spendingLimitWon) * 100))}%`
+                width: `${Math.min(100, Math.round((currentPlannedDealsSpend / (spendingLimitWon + totalPostBenefits)) * 100))}%`
               }}
             />
           </div>

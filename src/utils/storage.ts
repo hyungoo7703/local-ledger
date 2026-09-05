@@ -3,14 +3,16 @@ import { AppState, SalaryConfig } from '../types';
 const STORAGE_KEY = 'LOCAL_LEDGER_DATA_V3';
 
 export const DEFAULT_QUICK_TAGS = [
+  '삼성LINK',
+  'T-day',
+  '신한Tops',
+  '네이버페이',
   '배민',
   '요기요',
-  '네이버페이',
   '쿠팡',
   '올영세일',
-  '통신사할인',
   '카드청구할인',
-  '포인트소진'
+  '포인트적립'
 ];
 
 export const DEFAULT_SALARY_CONFIG: SalaryConfig = {
@@ -56,7 +58,21 @@ export function loadAppState(): AppState {
     if (!parsed.salaryConfig.checklist) {
       parsed.salaryConfig.checklist = [];
     }
-    return parsed;
+    const deals = (parsed.deals || []).map((d: any) => ({
+      id: String(d.id || Date.now() + Math.random()),
+      date: String(d.date || ''),
+      title: String(d.title || '플랜'),
+      finalPrice: Number(d.finalPrice) || 0,
+      benefitType: (d.benefitType === 'bill_discount' || d.benefitType === 'point_reward')
+        ? d.benefitType
+        : (d.discountAmount ? 'bill_discount' : 'instant'),
+      benefitAmount: Number(d.benefitAmount ?? d.discountAmount ?? 0),
+      dealTag: String(d.dealTag || '기타'),
+      memo: d.memo ? String(d.memo) : '',
+      isCompleted: Boolean(d.isCompleted),
+      createdAt: Number(d.createdAt || Date.now())
+    }));
+    return { ...parsed, deals };
   } catch (err) {
     console.warn('Initializing clean V3 state:', err);
     const initial: AppState = {
@@ -93,8 +109,23 @@ export function importBackupJson(jsonStr: string): AppState {
     throw new Error('유효하지 않은 가계부 백업 데이터입니다.');
   }
 
-  // 1. Deals 복원
-  const deals = Array.isArray(parsed.deals) ? parsed.deals : [];
+  // 1. Deals 복원 (사후 혜택 및 즉시할인 호환 복원)
+  const deals = Array.isArray(parsed.deals)
+    ? parsed.deals.map((d: any) => ({
+        id: String(d.id || Date.now() + Math.random()),
+        date: String(d.date || ''),
+        title: String(d.title || '플랜'),
+        finalPrice: Number(d.finalPrice) || 0,
+        benefitType: (d.benefitType === 'bill_discount' || d.benefitType === 'point_reward')
+          ? d.benefitType
+          : (d.discountAmount ? 'bill_discount' : 'instant'),
+        benefitAmount: Number(d.benefitAmount ?? d.discountAmount ?? 0),
+        dealTag: String(d.dealTag || '기타'),
+        memo: d.memo ? String(d.memo) : '',
+        isCompleted: Boolean(d.isCompleted),
+        createdAt: Number(d.createdAt || Date.now())
+      }))
+    : [];
 
   // 2. SalaryConfig 복원 (만원 단위 월급, 차감 룰, 고정 체크리스트 완벽 복원)
   const salaryConfig: SalaryConfig = {

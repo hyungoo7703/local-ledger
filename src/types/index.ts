@@ -1,13 +1,18 @@
+export type BenefitType = 'instant' | 'bill_discount' | 'point_reward';
+// instant: 결제 전 즉시할인(쿠폰/세일) -> 최종 결제금액만 소비로 차감
+// bill_discount: 결제일(청구) 할인 -> 결제금액은 그대로지만 결제일 할인으로 한계 예산 증가/실질소비 차감
+// point_reward: 포인트/캐시백 적립 -> 결제금액은 그대로지만 포인트 적립으로 한계 예산 증가/실질소비 차감
+
 export interface DealItem {
   id: string;
   date: string; // YYYY-MM-DD
-  title: string; // e.g. "와퍼 주니어 세트", "올리브영 샴푸"
-  originalPrice?: number; // 정가
-  finalPrice: number; // 실제 결제/예정 금액
-  discountAmount: number; // 아낀 금액 (할인액)
-  dealTag: string; // e.g. "배민", "네이버페이", "올영세일", "통신사", "카드청구"
+  title: string; // e.g. "빕스 Tday", "버거킹 Tops쿠폰", "멸치국수 삼성LINK"
+  finalPrice: number; // 실제 결제(승인) 금액 (원 단위)
+  benefitType: BenefitType; // 혜택 유형
+  benefitAmount: number; // 결제일 할인액 또는 포인트 적립액 (원 단위, 예산 복원 효과)
+  dealTag: string; // e.g. "삼성LINK", "Tday", "신한Tops", "네이버페이"
   memo?: string;
-  isCompleted: boolean; // 실제 구매 완료 여부
+  isCompleted: boolean; // 실제 구매/체크 완료 여부
   createdAt: number;
 }
 
