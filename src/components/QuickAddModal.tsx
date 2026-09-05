@@ -213,35 +213,59 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             </div>
           )}
 
-          {/* Date & Title row */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-1">
-              <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5" /> 날짜
-              </label>
-              <input
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-              />
-            </div>
+          {/* Title row */}
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">
+              품목 / 먹을 것 / 살 것
+            </label>
+            <input
+              ref={titleInputRef}
+              type="text"
+              required
+              placeholder="예: 와퍼 주니어 1+1, 올영 샴푸"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
 
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-slate-400 mb-1">
-                품목 / 먹을 것 / 살 것
-              </label>
-              <input
-                ref={titleInputRef}
-                type="text"
-                required
-                placeholder="예: 와퍼 주니어 1+1, 올영 샴푸"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-              />
+          {/* Date row with full width & quick shortcuts */}
+          <div>
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400 mb-1">
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-indigo-400" /> 날짜
+              </span>
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setDate(getTodayString())}
+                  className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  오늘
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 1);
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    setDate(`${y}-${m}-${day}`);
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  내일
+                </button>
+              </div>
             </div>
+            <input
+              type="date"
+              required
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+            />
           </div>
 
           {/* Prices row */}

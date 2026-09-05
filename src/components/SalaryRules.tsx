@@ -14,9 +14,17 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   currentPlannedDealsSpend,
   onUpdateConfig
 }) => {
-  const [baseSalaryInput, setBaseSalaryInput] = useState<string>(String(config.baseSalary));
+  const [baseSalaryInput, setBaseSalaryInput] = useState<string>(
+    config.baseSalary ? String(config.baseSalary) : ''
+  );
   const [payday, setPayday] = useState<number>(config.payday || 25);
   const [rules, setRules] = useState<SalaryRuleItem[]>(config.rules);
+
+  React.useEffect(() => {
+    setBaseSalaryInput(config.baseSalary ? String(config.baseSalary) : '');
+    setPayday(config.payday || 25);
+    setRules(config.rules);
+  }, [config]);
 
   const totalRatio = rules.reduce((sum, r) => sum + (Number(r.ratio) || 0), 0);
   const isRatioValid = totalRatio === 100;
@@ -110,13 +118,14 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
             <input
               type="text"
               inputMode="numeric"
-              value={Number(baseSalaryInput).toLocaleString()}
+              placeholder="월급을 입력해주세요 (예: 3,000,000)"
+              value={baseSalaryInput && Number(baseSalaryInput) > 0 ? Number(baseSalaryInput).toLocaleString() : ''}
               onChange={(e) => {
                 const val = e.target.value.replace(/\D/g, '');
                 setBaseSalaryInput(val);
               }}
               onBlur={handleSalaryBlur}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-base font-extrabold text-white focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-base font-extrabold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
             <span className="absolute right-3 top-3 text-xs text-slate-400">원</span>
           </div>
@@ -142,7 +151,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
         </div>
 
         {/* Deal Budget Alert Banner */}
-        {dealRule && (
+        {config.baseSalary > 0 && dealRule ? (
           <div className="bg-indigo-950/40 rounded-xl p-3 border border-indigo-500/30 flex items-start gap-2.5">
             <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
             <div className="text-xs">
@@ -158,6 +167,11 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
                 </strong>
               </p>
             </div>
+          </div>
+        ) : (
+          <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/40 text-xs text-slate-400 flex items-center gap-2">
+            <Info className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span>월급을 입력하시면 각 항목별 예산이 자동으로 계산됩니다.</span>
           </div>
         )}
       </div>
