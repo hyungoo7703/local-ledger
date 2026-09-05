@@ -40,20 +40,20 @@ export const StatsCard: React.FC<StatsCardProps> = ({
             <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
               <span className="font-semibold flex items-center gap-1 whitespace-nowrap">
                 <Wallet className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                결제 예정
+                소비
               </span>
             </div>
             <div className="text-lg font-bold text-white tracking-tight">
               {formatCompactKRW(totalPlannedSpend)}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5 whitespace-nowrap truncate">
-              승인: {formatKRW(totalPlannedSpend)}
+              결제 {formatKRW(totalPlannedSpend)}
             </div>
           </div>
 
           {totalPostBenefits > 0 && (
             <div className="mt-2 pt-1.5 border-t border-slate-700/50 text-[11px] text-indigo-300 font-medium whitespace-nowrap truncate">
-              실질 {formatKRW(netSpend)}
+              실질 순소비 {formatKRW(netSpend)}
             </div>
           )}
         </div>
@@ -130,7 +130,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
           {/* Bottom Row: Detail Breakdown */}
           <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
             <div className="truncate">
-              <span>결제 예정 </span>
+              <span>소비 </span>
               <strong className="text-slate-200">{formatCompactKRW(totalPlannedSpend)}</strong>
             </div>
 

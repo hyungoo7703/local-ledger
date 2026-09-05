@@ -367,7 +367,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                 ) : (
                   <>
                     <Coins className="w-3.5 h-3.5 text-pink-400 shrink-0" />
-                    <span>적립 예정 금액 (원 단위)</span>
+                    <span>적립 금액 (원 단위)</span>
                   </>
                 )}
               </label>
