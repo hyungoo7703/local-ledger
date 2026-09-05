@@ -181,22 +181,22 @@ export const DealList: React.FC<DealListProps> = ({
                     </div>
 
                     {deal.benefitType === 'bill_discount' && deal.benefitAmount > 0 && (
-                      <div className="flex items-center gap-1 bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 px-2 py-1 rounded-lg font-semibold">
-                        <CreditCard className="w-3 h-3 text-emerald-400" />
-                        <span>결제일 -{formatKRW(deal.benefitAmount)} 청구할인</span>
+                      <div className="flex items-center gap-1 bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 px-2 py-1 rounded-lg font-semibold whitespace-nowrap">
+                        <CreditCard className="w-3 h-3 text-emerald-400 shrink-0" />
+                        <span>-{formatKRW(deal.benefitAmount)} 청구할인</span>
                       </div>
                     )}
 
                     {deal.benefitType === 'point_reward' && deal.benefitAmount > 0 && (
-                      <div className="flex items-center gap-1 bg-pink-950/60 text-pink-300 border border-pink-500/40 px-2 py-1 rounded-lg font-semibold">
-                        <Coins className="w-3 h-3 text-pink-400" />
-                        <span>+{formatKRW(deal.benefitAmount)} 포인트적립</span>
+                      <div className="flex items-center gap-1 bg-pink-950/60 text-pink-300 border border-pink-500/40 px-2 py-1 rounded-lg font-semibold whitespace-nowrap">
+                        <Coins className="w-3 h-3 text-pink-400 shrink-0" />
+                        <span>+{formatKRW(deal.benefitAmount)} 적립</span>
                       </div>
                     )}
 
                     {deal.benefitType !== 'instant' && deal.benefitAmount > 0 && (
-                      <span className="text-[11px] text-indigo-300/90 font-medium">
-                        (실질 {formatKRW(Math.max(0, deal.finalPrice - deal.benefitAmount))} · 예산 +{formatKRW(deal.benefitAmount)})
+                      <span className="text-[11px] text-indigo-300/90 font-medium whitespace-nowrap">
+                        (실질 {formatKRW(Math.max(0, deal.finalPrice - deal.benefitAmount))})
                       </span>
                     )}
                   </div>

@@ -328,8 +328,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                     : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
                 }`}
               >
-                <ShoppingBag className="w-4 h-4" />
-                <span className="text-center text-[11px] leading-tight">즉시할인 / 일반</span>
+                <ShoppingBag className="w-4 h-4 shrink-0" />
+                <span className="text-center text-xs whitespace-nowrap">즉시할인</span>
               </button>
 
               {/* Bill discount (삼성LINK, 청구할인 등) */}
@@ -342,8 +342,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                     : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
                 }`}
               >
-                <CreditCard className="w-4 h-4" />
-                <span className="text-center text-[11px] leading-tight">결제일 청구할인</span>
+                <CreditCard className="w-4 h-4 shrink-0" />
+                <span className="text-center text-xs whitespace-nowrap">청구할인</span>
               </button>
 
               {/* Point reward (Tday 적립, 캐시백 등) */}
@@ -356,8 +356,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                     : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
                 }`}
               >
-                <Coins className="w-4 h-4" />
-                <span className="text-center text-[11px] leading-tight">포인트/캐시백 적립</span>
+                <Coins className="w-4 h-4 shrink-0" />
+                <span className="text-center text-xs whitespace-nowrap">포인트적립</span>
               </button>
             </div>
           </div>
@@ -365,16 +365,16 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           {/* Conditional Benefit Amount Input (for bill_discount or point_reward) */}
           {benefitType !== 'instant' && (
             <div className="space-y-2 bg-slate-800/50 p-3 rounded-2xl border border-slate-700/80">
-              <label className="block text-xs font-semibold text-white flex items-center gap-1">
+              <label className="block text-xs font-semibold text-white flex items-center gap-1 whitespace-nowrap">
                 {benefitType === 'bill_discount' ? (
                   <>
-                    <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>결제일 청구할인 예정액 (원 단위)</span>
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>결제일 청구할인액 (원 단위)</span>
                   </>
                 ) : (
                   <>
-                    <Coins className="w-3.5 h-3.5 text-pink-400" />
-                    <span>적립 예정 금액 (포인트/캐시백)</span>
+                    <Coins className="w-3.5 h-3.5 text-pink-400 shrink-0" />
+                    <span>적립 예정 금액 (원 단위)</span>
                   </>
                 )}
               </label>
@@ -407,12 +407,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                       : 'bg-pink-950/40 border-pink-500/30 text-pink-200'
                   }`}
                 >
-                  <div className="flex items-center justify-between font-bold">
-                    <span>✨ 한계 소비 예산 확대 효과:</span>
+                  <div className="flex items-center justify-between font-bold whitespace-nowrap">
+                    <span>✨ 예산 확대 효과:</span>
                     <span>+{formatKRW(parsedBenefit)}</span>
                   </div>
-                  <div className="text-[11px] text-slate-300">
-                    결제 {formatKRW(parsedPaid)} - 혜택 {formatKRW(parsedBenefit)} = 실질 지출{' '}
+                  <div className="text-[11px] text-slate-300 whitespace-nowrap truncate">
+                    결제 {formatKRW(parsedPaid)} · 실질 순지출{' '}
                     <strong className="text-white underline">{formatKRW(netSpend)}</strong>
                   </div>
                 </div>

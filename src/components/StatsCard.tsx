@@ -38,53 +38,55 @@ export const StatsCard: React.FC<StatsCardProps> = ({
         <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/40 relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span className="font-medium">결제(승인) 예정액</span>
-              <Wallet className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="font-semibold flex items-center gap-1 whitespace-nowrap">
+                <Wallet className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                결제 예정
+              </span>
             </div>
             <div className="text-lg font-bold text-white tracking-tight">
               {formatCompactKRW(totalPlannedSpend)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
+            <div className="text-[11px] text-slate-400 mt-0.5 whitespace-nowrap truncate">
               승인: {formatKRW(totalPlannedSpend)}
             </div>
           </div>
 
           {totalPostBenefits > 0 && (
-            <div className="mt-2 pt-1.5 border-t border-slate-700/50 text-[11px] text-indigo-300 font-medium truncate">
-              실질 순소비: <strong>{formatKRW(netSpend)}</strong>
+            <div className="mt-2 pt-1.5 border-t border-slate-700/50 text-[11px] text-indigo-300 font-medium whitespace-nowrap truncate">
+              실질 {formatKRW(netSpend)}
             </div>
           )}
         </div>
 
-        {/* Post Benefits Card (청구할인 + 적립) */}
+        {/* Post Benefits Card */}
         <div className="bg-gradient-to-br from-indigo-950/60 via-slate-900 to-pink-950/40 rounded-xl p-3 border border-indigo-500/30 relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-xs text-pink-300 mb-1">
-              <span className="font-medium flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-                사후 혜택 (청구+적립)
+              <span className="font-semibold flex items-center gap-1 whitespace-nowrap">
+                <Sparkles className="w-3.5 h-3.5 text-pink-400 shrink-0" />
+                사후 혜택
               </span>
-              <TrendingDown className="w-3.5 h-3.5 text-emerald-400" />
+              <TrendingDown className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             </div>
             <div className="text-lg font-extrabold text-pink-400 tracking-tight">
               +{formatCompactKRW(totalPostBenefits)}
             </div>
-            <div className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-1.5 flex-wrap">
+            <div className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
               <span className="flex items-center gap-0.5 text-emerald-300">
-                <CreditCard className="w-3 h-3" />
+                <CreditCard className="w-3 h-3 shrink-0" />
                 {formatCompactKRW(billDiscountTotal)}
               </span>
               <span>·</span>
               <span className="flex items-center gap-0.5 text-pink-300">
-                <Coins className="w-3 h-3" />
+                <Coins className="w-3 h-3 shrink-0" />
                 {formatCompactKRW(pointRewardTotal)}
               </span>
             </div>
           </div>
 
           {totalPostBenefits > 0 && (
-            <div className="mt-2 pt-1.5 border-t border-pink-500/20 text-[11px] text-emerald-400 font-semibold truncate">
-              ✨ 한계 예산 +{formatCompactKRW(totalPostBenefits)} 확대!
+            <div className="mt-2 pt-1.5 border-t border-pink-500/20 text-[11px] text-emerald-400 font-semibold whitespace-nowrap truncate">
+              예산 +{formatCompactKRW(totalPostBenefits)} 확대
             </div>
           )}
         </div>
@@ -93,22 +95,21 @@ export const StatsCard: React.FC<StatsCardProps> = ({
       {/* Budget Bar & Progress */}
       {baseBudgetWon > 0 && (
         <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-800 text-xs space-y-2">
-          <div className="flex justify-between items-center text-slate-300 flex-wrap gap-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-slate-400">한계 예산:</span>
-              <span className="text-slate-300">{formatCompactKRW(baseBudgetWon)}</span>
+          <div className="flex justify-between items-center text-slate-300 gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-slate-400 text-xs shrink-0">한계 예산:</span>
+              <span className="font-bold text-indigo-300 text-xs shrink-0">
+                {formatCompactKRW(adjustedBudgetWon)}
+              </span>
               {totalPostBenefits > 0 && (
-                <span className="text-emerald-400 font-semibold">
-                  (+{formatCompactKRW(totalPostBenefits)} 혜택)
+                <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30 whitespace-nowrap shrink-0">
+                  +{formatCompactKRW(totalPostBenefits)} 혜택
                 </span>
               )}
-              <span className="text-indigo-300 font-bold">
-                = {formatCompactKRW(adjustedBudgetWon)}
-              </span>
             </div>
 
-            <span className={`font-semibold ${isOverBudget ? 'text-rose-400' : 'text-indigo-300'}`}>
-              {budgetRatio}% ({isOverBudget ? '예산 초과' : `${formatCompactKRW(remainingBudgetWon)} 남음`})
+            <span className={`font-semibold text-xs shrink-0 whitespace-nowrap ${isOverBudget ? 'text-rose-400' : 'text-indigo-300'}`}>
+              {budgetRatio}% ({isOverBudget ? '초과' : `${formatCompactKRW(remainingBudgetWon)} 남음`})
             </span>
           </div>
 
