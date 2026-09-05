@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #090d16;
+  color: #f1f5f9;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input, textarea, button {
+  user-select: auto;
+}
+
+/* Custom Scrollbar for clean mobile feel */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Safe area insets for mobile notched devices */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 1.25rem);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0.75rem);
+}
