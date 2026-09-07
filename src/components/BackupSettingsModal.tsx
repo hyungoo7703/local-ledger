@@ -99,7 +99,7 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
         </div>
         <p className="text-xs text-slate-300 leading-relaxed">
           이 앱은 별도의 서버나 데이터베이스를 사용하지 않으며, 모든 가계부 기록과 월급 설정은
-          오직 **내 기기 브라우저(LocalStorage)**에만 안전하게 보관됩니다.
+          오직 <strong className="text-white">내 기기 브라우저(LocalStorage)</strong>에만 안전하게 보관됩니다.
         </p>
         <p className="text-[11px] text-amber-400/90">
           ⚠️ 기기 변경이나 브라우저 쿠키/캐시 정리 시 데이터가 지워질 수 있으니, 중요한 내역은 아래
