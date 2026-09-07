@@ -56,10 +56,14 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   const spendingLimitManwon = calculateSpendingLimitManwon(currentConfig);
   const spendingLimitWon = spendingLimitManwon * 10000;
 
+  // Carry the whole form state on every update. Otherwise the sync effect above
+  // reverts an in-progress salary edit as soon as any other field changes.
+  const commit = (patch: Partial<SalaryConfig>) => {
+    onUpdateConfig({ baseSalaryManwon, payday, deductions, checklist, ...patch });
+  };
+
   const handleSalaryBlur = () => {
-    const parsed = parseInt(baseSalaryInput.replace(/\D/g, ''), 10) || 0;
-    const updated = { ...config, baseSalaryManwon: parsed, payday, deductions };
-    onUpdateConfig(updated);
+    commit({ baseSalaryManwon: parseInt(baseSalaryInput.replace(/\D/g, ''), 10) || 0 });
   };
 
   const handleToggleSpending = (id: string) => {
@@ -67,7 +71,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
       item.id === id ? { ...item, isSpending: !item.isSpending } : item
     );
     setDeductions(updated);
-    onUpdateConfig({ ...config, deductions: updated });
+    commit({ deductions: updated });
   };
 
   const handleAmountChange = (id: string, amount: number) => {
@@ -75,7 +79,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
       item.id === id ? { ...item, amountManwon: Math.max(0, amount) } : item
     );
     setDeductions(updated);
-    onUpdateConfig({ ...config, deductions: updated });
+    commit({ deductions: updated });
   };
 
   const handleStepAmount = (id: string, step: number) => {
@@ -83,13 +87,13 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
       item.id === id ? { ...item, amountManwon: Math.max(0, item.amountManwon + step) } : item
     );
     setDeductions(updated);
-    onUpdateConfig({ ...config, deductions: updated });
+    commit({ deductions: updated });
   };
 
   const handleDeleteItem = (id: string) => {
     const updated = deductions.filter((item) => item.id !== id);
     setDeductions(updated);
-    onUpdateConfig({ ...config, deductions: updated });
+    commit({ deductions: updated });
   };
 
   // 한 줄 퀵 추가 파서 (예: "ISA 100", "국민카드 40 소비")
@@ -120,7 +124,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
 
     const updated = [...deductions, newItem];
     setDeductions(updated);
-    onUpdateConfig({ ...config, deductions: updated });
+    commit({ deductions: updated });
     setQuickOneLiner('');
   };
 
@@ -139,7 +143,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
 
     const updated = [...deductions, newItem];
     setDeductions(updated);
-    onUpdateConfig({ ...config, deductions: updated });
+    commit({ deductions: updated });
 
     setNewName('');
     setNewAmount('');
@@ -152,7 +156,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
       item.id === id ? { ...item, isChecked: !item.isChecked } : item
     );
     setChecklist(updated);
-    onUpdateConfig({ ...config, deductions, checklist: updated });
+    commit({ checklist: updated });
   };
 
   const handleResetAllChecks = () => {
@@ -160,7 +164,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
     if (window.confirm('새 달 시작: 모든 항목의 체크를 해제할까요?')) {
       const updated = checklist.map((item) => ({ ...item, isChecked: false }));
       setChecklist(updated);
-      onUpdateConfig({ ...config, deductions, checklist: updated });
+      commit({ checklist: updated });
     }
   };
 
@@ -176,7 +180,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
 
     const updated = [...checklist, newItem];
     setChecklist(updated);
-    onUpdateConfig({ ...config, deductions, checklist: updated });
+    commit({ checklist: updated });
     setNewChecklistTitle('');
   };
 
@@ -195,13 +199,13 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
     }
     const updated = [...checklist, ...toAdd];
     setChecklist(updated);
-    onUpdateConfig({ ...config, deductions, checklist: updated });
+    commit({ checklist: updated });
   };
 
   const handleDeleteChecklistItem = (id: string) => {
     const updated = checklist.filter((item) => item.id !== id);
     setChecklist(updated);
-    onUpdateConfig({ ...config, deductions, checklist: updated });
+    commit({ checklist: updated });
   };
 
   const completedCheckCount = checklist.filter((c) => c.isChecked).length;
@@ -231,7 +235,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
               onChange={(e) => {
                 const val = Number(e.target.value);
                 setPayday(val);
-                onUpdateConfig({ ...config, payday: val });
+                commit({ payday: val });
               }}
               className="bg-transparent text-xs text-indigo-300 font-bold focus:outline-none cursor-pointer"
             >
@@ -283,7 +287,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
                   const current = parseInt(baseSalaryInput.replace(/\D/g, ''), 10) || 0;
                   const next = current + step;
                   setBaseSalaryInput(String(next));
-                  onUpdateConfig({ ...config, baseSalaryManwon: next, payday, deductions });
+                  commit({ baseSalaryManwon: next });
                 }}
                 className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700 transition"
               >
