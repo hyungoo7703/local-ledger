@@ -16,6 +16,10 @@ const COMMON_TAGS = [
   '맥도날드', 'GS25', 'CU', '토스', '신한', 'KB', '현대', '삼성'
 ];
 
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * 자연어 한 줄 입력 파서
  * 예시 입력:
@@ -26,7 +30,8 @@ const COMMON_TAGS = [
 export function parseQuickEntry(
   rawInput: string,
   targetYear: number,
-  targetMonth: number
+  targetMonth: number,
+  userTags: string[] = []
 ): ParsedEntry {
   let text = rawInput.trim();
   if (!text) {
@@ -71,10 +76,13 @@ export function parseQuickEntry(
     text = text.replace(explicitBenefitMatch[0], ' ').trim();
   }
 
-  // 3. 태그 추출
+  // 3. 태그 추출 (사용자 태그 우선, 긴 태그부터 매칭해 '삼성LINK'가 '삼성'에 가려지지 않게)
   let dealTag = '';
-  for (const tag of COMMON_TAGS) {
-    const regex = new RegExp(`(^|\\s)(${tag})(\\s|$)`, 'i');
+  const candidateTags = [...new Set([...userTags, ...COMMON_TAGS])].sort(
+    (a, b) => b.length - a.length
+  );
+  for (const tag of candidateTags) {
+    const regex = new RegExp(`(^|\\s)(${escapeRegExp(tag)})(\\s|$)`, 'i');
     if (regex.test(text)) {
       dealTag = tag;
       text = text.replace(regex, ' ').trim();

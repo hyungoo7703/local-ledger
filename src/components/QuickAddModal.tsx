@@ -82,7 +82,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     if (e) e.preventDefault();
     if (!quickText.trim()) return;
 
-    const parsed = parseQuickEntry(quickText, currentYear, currentMonth);
+    const parsed = parseQuickEntry(quickText, currentYear, currentMonth, quickTags);
     if (parsed.date) setDate(parsed.date);
     if (parsed.title) setTitle(parsed.title);
     if (parsed.finalPrice > 0) setFinalPrice(String(parsed.finalPrice));
@@ -107,7 +107,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     let finalSelectedTag = dealTag;
 
     if (!finalTitle && quickText.trim()) {
-      const parsed = parseQuickEntry(quickText, currentYear, currentMonth);
+      const parsed = parseQuickEntry(quickText, currentYear, currentMonth, quickTags);
       finalTitle = parsed.title;
       if (parsed.finalPrice > 0) finalPaid = parsed.finalPrice;
       finalType = parsed.benefitType;
