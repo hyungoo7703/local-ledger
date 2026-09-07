@@ -1,6 +1,7 @@
 import { AppState, SalaryConfig } from '../types';
 
 const STORAGE_KEY = 'LOCAL_LEDGER_DATA_V3';
+const BROKEN_KEY_PREFIX = 'LOCAL_LEDGER_BROKEN_';
 
 export const DEFAULT_QUICK_TAGS = [
   '삼성LINK',
@@ -39,18 +40,49 @@ export function calculateSpendingLimitManwon(config: SalaryConfig): number {
     .reduce((sum, item) => sum + (Number(item.amountManwon) || 0), 0);
 }
 
-export function loadAppState(): AppState {
+function createInitialState(): AppState {
+  return {
+    deals: [],
+    salaryConfig: { ...DEFAULT_SALARY_CONFIG, deductions: [], checklist: [] },
+    quickTags: [...DEFAULT_QUICK_TAGS]
+  };
+}
+
+// localStorage is the only copy of the user's ledger, so unreadable data is
+// set aside under a timestamped key instead of being overwritten.
+function quarantineBrokenState(raw: string): void {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const initial: AppState = {
-        deals: [],
-        salaryConfig: DEFAULT_SALARY_CONFIG,
-        quickTags: DEFAULT_QUICK_TAGS
-      };
-      saveAppState(initial);
-      return initial;
-    }
+    localStorage.setItem(`${BROKEN_KEY_PREFIX}${Date.now()}`, raw);
+  } catch (err) {
+    console.error('Failed to quarantine unreadable state', err);
+  }
+}
+
+export function listBrokenStateKeys(): string[] {
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(BROKEN_KEY_PREFIX)) keys.push(key);
+  }
+  return keys.sort().reverse();
+}
+
+export function loadAppState(): AppState {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch (err) {
+    console.error('localStorage is unavailable', err);
+    return createInitialState();
+  }
+
+  if (!raw) {
+    const initial = createInitialState();
+    saveAppState(initial);
+    return initial;
+  }
+
+  try {
     const parsed = JSON.parse(raw) as AppState;
     if (!Array.isArray(parsed.deals) || !parsed.salaryConfig?.deductions) {
       throw new Error('Schema update needed');
@@ -74,12 +106,9 @@ export function loadAppState(): AppState {
     }));
     return { ...parsed, deals };
   } catch (err) {
-    console.warn('Initializing clean V3 state:', err);
-    const initial: AppState = {
-      deals: [],
-      salaryConfig: DEFAULT_SALARY_CONFIG,
-      quickTags: DEFAULT_QUICK_TAGS
-    };
+    console.warn('Quarantining unreadable state:', err);
+    quarantineBrokenState(raw);
+    const initial = createInitialState();
     saveAppState(initial);
     return initial;
   }
@@ -164,11 +193,7 @@ export function importBackupJson(jsonStr: string): AppState {
 }
 
 export function resetToDefault(): AppState {
-  const initial: AppState = {
-    deals: [],
-    salaryConfig: DEFAULT_SALARY_CONFIG,
-    quickTags: DEFAULT_QUICK_TAGS
-  };
+  const initial = createInitialState();
   saveAppState(initial);
   return initial;
 }
