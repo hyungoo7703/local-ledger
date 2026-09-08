@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Sparkles, Plus, Calendar, Tag, Check, ArrowRight, CreditCard, Coins, ShoppingBag } from 'lucide-react';
+import { X, Sparkles, Plus, Calendar, Tag, Check, ArrowRight, CreditCard, Coins, ShoppingBag, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DealItem, BenefitType } from '../types';
 import { generateId, getTodayString, formatKRW } from '../utils/formatters';
 import { parseQuickEntry } from '../utils/parser';
+import { loadAiConfig, hasApiKey, parseEntryWithGemini, AiError } from '../utils/ai';
 
 interface QuickAddModalProps {
   isOpen: boolean;
@@ -41,6 +42,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [dealTag, setDealTag] = useState('');
   const [memo, setMemo] = useState('');
   const [isTagManageMode, setIsTagManageMode] = useState(false);
+  const [isAiRunning, setIsAiRunning] = useState(false);
+  const [aiNotice, setAiNotice] = useState<{ kind: 'ok' | 'warn'; text: string } | null>(null);
 
   const quickInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -72,27 +75,61 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         }, 150);
       }
       setIsTagManageMode(false);
+      setAiNotice(null);
+      setIsAiRunning(false);
     }
   }, [isOpen, editItem, initialDate, quickTags]);
 
   if (!isOpen) return null;
 
-  // 한 줄 퀵 텍스트 파싱 적용
-  const handleApplyQuickText = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!quickText.trim()) return;
-
+  const applyRegexParse = () => {
     const parsed = parseQuickEntry(quickText, currentYear, currentMonth, quickTags);
     if (parsed.date) setDate(parsed.date);
     if (parsed.title) setTitle(parsed.title);
     if (parsed.finalPrice > 0) setFinalPrice(String(parsed.finalPrice));
     setBenefitType(parsed.benefitType);
-    if (parsed.benefitAmount > 0) {
-      setBenefitAmount(String(parsed.benefitAmount));
-    } else {
-      setBenefitAmount('');
-    }
+    setBenefitAmount(parsed.benefitAmount > 0 ? String(parsed.benefitAmount) : '');
     if (parsed.dealTag) setDealTag(parsed.dealTag);
+  };
+
+  // AI 키가 있으면 AI로, 없거나 실패하면 기존 정규식으로 처리한다.
+  const handleApplyQuickText = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!quickText.trim() || isAiRunning) return;
+
+    const aiConfig = loadAiConfig();
+    if (!hasApiKey(aiConfig)) {
+      applyRegexParse();
+      setAiNotice(null);
+      return;
+    }
+
+    setIsAiRunning(true);
+    setAiNotice(null);
+    try {
+      const parsed = await parseEntryWithGemini(quickText, {
+        config: aiConfig,
+        today: getTodayString(),
+        quickTags
+      });
+      setDate(parsed.date || initialDate || getTodayString());
+      setTitle(parsed.title);
+      setFinalPrice(parsed.finalPrice > 0 ? String(parsed.finalPrice) : '');
+      setBenefitType(parsed.benefitType);
+      setBenefitAmount(parsed.benefitAmount > 0 ? String(parsed.benefitAmount) : '');
+      setDealTag(parsed.dealTag);
+      if (parsed.breakdown) {
+        setMemo(parsed.breakdown);
+        setAiNotice({ kind: 'ok', text: parsed.breakdown });
+      }
+    } catch (err) {
+      const message =
+        err instanceof AiError ? err.message : 'AI 인식에 실패했습니다.';
+      applyRegexParse();
+      setAiNotice({ kind: 'warn', text: `${message} 기본 인식으로 처리했습니다.` });
+    } finally {
+      setIsAiRunning(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -214,18 +251,41 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                       handleApplyQuickText();
                     }
                   }}
-                  placeholder="예: 15일 와퍼 6000 요기요할인 3000"
+                  placeholder="예: 빕스 3인 인당 49700원, Tday 40프로 적립"
                   className="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
                 <button
                   type="button"
                   onClick={() => handleApplyQuickText()}
-                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-95 transition"
+                  disabled={isAiRunning}
+                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-95 transition"
                 >
-                  <span>인식</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  {isAiRunning ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>인식 중</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>인식</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
                 </button>
               </div>
+
+              {aiNotice && (
+                <div
+                  className={`mt-2 p-2 rounded-xl text-[11px] border leading-relaxed ${
+                    aiNotice.kind === 'ok'
+                      ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
+                      : 'bg-amber-950/40 border-amber-500/30 text-amber-200'
+                  }`}
+                >
+                  {aiNotice.kind === 'ok' && <strong className="mr-1">계산 근거:</strong>}
+                  {aiNotice.text}
+                </div>
+              )}
             </div>
           )}
 
