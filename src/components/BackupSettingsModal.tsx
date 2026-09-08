@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
 import { AppState } from '../types';
-import { Copy, Download, Upload, RotateCcw, ShieldCheck, Check, Smartphone, HelpCircle } from 'lucide-react';
-import { exportBackupJson, importBackupJson, resetToDefault } from '../utils/storage';
+import { Copy, Download, Upload, RotateCcw, ShieldCheck, Check, Smartphone, History, Trash2 } from 'lucide-react';
+import {
+  exportBackupJson,
+  parseBackupJson,
+  applyImportedState,
+  summarizeState,
+  listSnapshots,
+  readSnapshot,
+  deleteSnapshot,
+  resetToDefault,
+  StateSnapshot
+} from '../utils/storage';
 
 interface BackupSettingsProps {
   appState: AppState;
@@ -16,6 +26,7 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState(false);
+  const [snapshots, setSnapshots] = useState<StateSnapshot[]>(() => listSnapshots());
 
   // Copy to clipboard
   const handleCopy = async () => {
@@ -44,40 +55,105 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Import JSON from file input
+  // 검증 -> 내용 확인 -> 적용. 확인 전에는 기존 데이터를 건드리지 않는다.
+  const runImport = (jsonStr: string, onDone?: () => void) => {
+    let parsed: ReturnType<typeof parseBackupJson>;
+    try {
+      parsed = parseBackupJson(jsonStr);
+    } catch (err: any) {
+      setImportError(err.message || '유효하지 않은 백업 데이터입니다.');
+      setImportSuccess(false);
+      return;
+    }
+
+    const now = summarizeState(appState);
+    const { summary } = parsed;
+    const exportedLabel = summary.exportedAt
+      ? `\n백업 시점: ${new Date(summary.exportedAt).toLocaleString('ko-KR')}`
+      : '';
+
+    const proceed = window.confirm(
+      `[가져올 데이터]${exportedLabel}\n` +
+        `· 플랜 ${summary.dealCount}건\n` +
+        `· 차감 항목 ${summary.deductionCount}건 / 체크리스트 ${summary.checklistCount}건\n` +
+        `· 월급 ${summary.baseSalaryManwon}만원\n\n` +
+        `[현재 데이터]\n` +
+        `· 플랜 ${now.dealCount}건 / 차감 ${now.deductionCount}건 / 월급 ${now.baseSalaryManwon}만원\n\n` +
+        `현재 데이터는 위 내용으로 모두 교체됩니다.\n` +
+        `교체 직전 상태는 자동으로 백업되어 아래 '되돌리기'에서 복구할 수 있습니다.\n\n` +
+        `계속할까요?`
+    );
+    if (!proceed) return;
+
+    try {
+      applyImportedState(parsed.state);
+    } catch (err: any) {
+      setImportError(err.message || '복원에 실패했습니다.');
+      setImportSuccess(false);
+      return;
+    }
+
+    onStateChange(parsed.state);
+    setSnapshots(listSnapshots());
+    setImportError('');
+    setImportSuccess(true);
+    onDone?.();
+    setTimeout(() => setImportSuccess(false), 3000);
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const input = e.target;
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const imported = importBackupJson(text);
-        onStateChange(imported);
-        setImportSuccess(true);
-        setImportError('');
-        setTimeout(() => setImportSuccess(false), 3000);
-      } catch (err: any) {
-        setImportError(err.message || '파일 가져오기에 실패했습니다.');
-      }
+      runImport(String(event.target?.result ?? ''));
+      input.value = ''; // 같은 파일을 다시 선택할 수 있도록 초기화
+    };
+    reader.onerror = () => {
+      setImportError('파일을 읽지 못했습니다.');
+      input.value = '';
     };
     reader.readAsText(file);
   };
 
-  // Import from textarea
   const handleTextImport = () => {
     if (!importText.trim()) return;
-    try {
-      const imported = importBackupJson(importText);
-      onStateChange(imported);
-      setImportSuccess(true);
-      setImportError('');
-      setImportText('');
-      setTimeout(() => setImportSuccess(false), 3000);
-    } catch (err: any) {
-      setImportError(err.message || '유효하지 않은 백업 데이터입니다.');
+    runImport(importText, () => setImportText(''));
+  };
+
+  // 교체 직전 상태 및 손상 데이터 복구
+  const handleDownloadSnapshot = (snap: StateSnapshot) => {
+    const raw = readSnapshot(snap.key);
+    if (!raw) {
+      setImportError('백업을 읽지 못했습니다.');
+      return;
     }
+    const blob = new Blob([raw], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `local-ledger-${snap.kind}-${new Date(snap.savedAt).toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRestoreSnapshot = (snap: StateSnapshot) => {
+    const raw = readSnapshot(snap.key);
+    if (!raw) {
+      setImportError('백업을 읽지 못했습니다.');
+      return;
+    }
+    runImport(raw);
+  };
+
+  const handleDeleteSnapshot = (snap: StateSnapshot) => {
+    if (!window.confirm('이 백업을 삭제할까요? 되돌릴 수 없습니다.')) return;
+    deleteSnapshot(snap.key);
+    setSnapshots(listSnapshots());
   };
 
   // Complete Reset
@@ -85,7 +161,8 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
     if (window.confirm('정말로 모든 데이터(소비 플랜, 월급 및 차감 룰, 고정 체크리스트)를 완전히 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
       const reset = resetToDefault();
       onStateChange(reset);
-      alert('모든 데이터가 완전히 초기화되었습니다.');
+      setSnapshots(listSnapshots());
+      alert('모든 데이터가 초기화되었습니다. 직전 상태는 아래 \'되돌리기\'에서 복구할 수 있습니다.');
     }
   };
 
@@ -186,6 +263,72 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
           )}
         </div>
       </div>
+
+      {/* Automatic snapshots (되돌리기) */}
+      {snapshots.length > 0 && (
+        <div className="bg-slate-900/80 rounded-2xl p-4 border border-amber-800/40 space-y-3">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-amber-400" />
+            <h4 className="text-xs font-bold text-slate-200">되돌리기 (자동 백업)</h4>
+          </div>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            복원·초기화로 교체되기 직전의 데이터, 그리고 읽지 못한 손상 데이터가 자동으로 보관됩니다.
+            최근 5개까지만 유지됩니다.
+          </p>
+
+          <div className="space-y-2">
+            {snapshots.map((snap) => (
+              <div
+                key={snap.key}
+                className="bg-slate-800/60 rounded-xl p-2.5 border border-slate-700/60 flex items-center gap-2"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                        snap.kind === 'broken'
+                          ? 'bg-rose-950/60 text-rose-300 border-rose-800/60'
+                          : 'bg-amber-950/60 text-amber-300 border-amber-800/60'
+                      }`}
+                    >
+                      {snap.kind === 'broken' ? '손상 데이터' : '교체 직전'}
+                    </span>
+                    <span className="text-[11px] text-slate-300 font-medium">
+                      {snap.savedAt ? new Date(snap.savedAt).toLocaleString('ko-KR') : '시점 불명'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500">
+                    {(snap.size / 1024).toFixed(1)} KB
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => handleRestoreSnapshot(snap)}
+                  className="px-2.5 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold hover:bg-indigo-600/30 transition active:scale-95 shrink-0"
+                >
+                  복원
+                </button>
+                <button
+                  onClick={() => handleDownloadSnapshot(snap)}
+                  className="p-1.5 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 hover:text-white transition active:scale-95 shrink-0"
+                  title="JSON 파일로 저장"
+                  aria-label="JSON 파일로 저장"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDeleteSnapshot(snap)}
+                  className="p-1.5 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 hover:text-rose-400 transition active:scale-95 shrink-0"
+                  title="이 백업 삭제"
+                  aria-label="이 백업 삭제"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* PWA Home screen guide */}
       <div className="bg-slate-900/60 rounded-2xl p-4 border border-slate-800 space-y-2">
