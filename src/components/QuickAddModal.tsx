@@ -43,7 +43,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [memo, setMemo] = useState('');
   const [isTagManageMode, setIsTagManageMode] = useState(false);
   const [isAiRunning, setIsAiRunning] = useState(false);
-  const [aiNotice, setAiNotice] = useState<{ kind: 'ok' | 'warn'; text: string } | null>(null);
+  const [aiNotice, setAiNotice] = useState<{ kind: 'ok' | 'warn' | 'error'; text: string } | null>(null);
+  const [inputMode, setInputMode] = useState<'basic' | 'ai'>('basic');
 
   const quickInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +78,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       setIsTagManageMode(false);
       setAiNotice(null);
       setIsAiRunning(false);
+      setInputMode('basic');
     }
   }, [isOpen, editItem, initialDate, quickTags]);
 
@@ -92,15 +94,24 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     if (parsed.dealTag) setDealTag(parsed.dealTag);
   };
 
-  // AI 키가 있으면 AI로, 없거나 실패하면 기존 정규식으로 처리한다.
+  // 기본 모드는 정규식, AI 모드는 Gemini. AI가 실패해도 정규식으로 몰래 넘기지 않는다.
+  // 정규식 결과가 AI 결과와 전혀 다른 품질이라, 실패를 감추면 잘못된 값을 저장하게 된다.
   const handleApplyQuickText = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!quickText.trim() || isAiRunning) return;
 
-    const aiConfig = loadAiConfig();
-    if (!hasApiKey(aiConfig)) {
+    if (inputMode === 'basic') {
       applyRegexParse();
       setAiNotice(null);
+      return;
+    }
+
+    const aiConfig = loadAiConfig();
+    if (!hasApiKey(aiConfig)) {
+      setAiNotice({
+        kind: 'error',
+        text: '설정 탭에서 Gemini API 키를 먼저 등록해 주세요.'
+      });
       return;
     }
 
@@ -132,10 +143,11 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           : null
       );
     } catch (err) {
-      const message =
-        err instanceof AiError ? err.message : 'AI 인식에 실패했습니다.';
-      applyRegexParse();
-      setAiNotice({ kind: 'warn', text: `${message} 기본 인식으로 처리했습니다.` });
+      const message = err instanceof AiError ? err.message : 'AI 인식에 실패했습니다.';
+      setAiNotice({
+        kind: 'error',
+        text: `${message} 잠시 후 다시 시도하거나, '기본'으로 전환해 직접 입력해 주세요.`
+      });
     } finally {
       setIsAiRunning(false);
     }
@@ -144,33 +156,14 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 만약 한 줄 입력만 적고 바로 등록 버튼을 누른 경우 자동 파싱
-    let finalTitle = title.trim();
-    let finalPaid = parseInt(finalPrice.replace(/,/g, ''), 10) || 0;
-    let finalType: BenefitType = benefitType;
-    let finalBenefit = parseInt(benefitAmount.replace(/,/g, ''), 10) || 0;
-    let finalTargetDate = date || getTodayString();
-    let finalSelectedTag = dealTag;
-
-    if (!finalTitle && quickText.trim()) {
-      const parsed = parseQuickEntry(quickText, currentYear, currentMonth, quickTags);
-      finalTitle = parsed.title;
-      if (parsed.finalPrice > 0) finalPaid = parsed.finalPrice;
-      finalType = parsed.benefitType;
-      if (parsed.benefitAmount > 0) finalBenefit = parsed.benefitAmount;
-      if (parsed.date) finalTargetDate = parsed.date;
-      if (parsed.dealTag) finalSelectedTag = parsed.dealTag;
-    }
-
-    if (!finalTitle) {
-      finalTitle = '소비/혜택 플랜';
-    }
-
-    if (finalType === 'instant') {
-      finalBenefit = 0;
-    }
-
-    const trimmedTag = (finalSelectedTag || '').trim();
+    // 폼에 보이는 값만 저장한다. 여기서 몰래 다시 파싱하면 사용자가 확인한 값과 달라진다.
+    const finalTitle = title.trim() || '소비/혜택 플랜';
+    const finalPaid = parseInt(finalPrice.replace(/,/g, ''), 10) || 0;
+    const finalType: BenefitType = benefitType;
+    const finalBenefit =
+      finalType === 'instant' ? 0 : parseInt(benefitAmount.replace(/,/g, ''), 10) || 0;
+    const finalTargetDate = date || getTodayString();
+    const trimmedTag = dealTag.trim();
 
     // 직접 입력한 새 태그는 quickTags에 자동으로 등록하여 다음번 원터치 재사용 지원
     if (trimmedTag && !quickTags.includes(trimmedTag)) {
@@ -239,15 +232,57 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4 pt-3">
           {/* Quick One-Liner Box (when not editing) */}
           {!editItem && (
-            <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-3">
-              <div className="flex items-center justify-between text-xs text-indigo-300 font-medium mb-1.5">
-                <span className="flex items-center gap-1">
-                  ⚡ <strong>한 줄 자연어 빠른 입력</strong>
+            <div
+              className={`border rounded-2xl p-3 transition-colors ${
+                inputMode === 'ai'
+                  ? 'bg-indigo-950/40 border-indigo-500/30'
+                  : 'bg-slate-800/40 border-slate-700/60'
+              }`}
+            >
+              {/* 모드 전환 */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-300 flex items-center gap-1">
+                  ⚡ <strong>한 줄 빠른 입력</strong>
                 </span>
-                <span className="text-[11px] text-indigo-400/80">
-                  대충 적어도 자동 인식
-                </span>
+                <div className="flex items-center bg-slate-900/80 p-0.5 rounded-lg border border-slate-700/60 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputMode('basic');
+                      setAiNotice(null);
+                    }}
+                    className={`px-2.5 py-1 rounded-md font-medium transition ${
+                      inputMode === 'basic'
+                        ? 'bg-slate-700 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    기본
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputMode('ai');
+                      setAiNotice(null);
+                    }}
+                    className={`px-2.5 py-1 rounded-md font-medium transition flex items-center gap-1 ${
+                      inputMode === 'ai'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    AI로 입력하기
+                  </button>
+                </div>
               </div>
+
+              <p className="text-[11px] text-slate-400 mb-1.5 leading-relaxed">
+                {inputMode === 'ai'
+                  ? '문장으로 편하게 적으면 됩니다. 개수·퍼센트·상대 날짜도 인식합니다.'
+                  : '날짜·금액·할인액을 숫자로 나열하면 즉시 인식합니다. 인터넷 없이 동작합니다.'}
+              </p>
+
               <div className="flex gap-2">
                 <input
                   ref={quickInputRef}
@@ -260,14 +295,22 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                       handleApplyQuickText();
                     }
                   }}
-                  placeholder="예: 빕스 3인 인당 49700원, Tday 40프로 적립"
+                  placeholder={
+                    inputMode === 'ai'
+                      ? '예: 빕스 3인 인당 49700원, Tday 40프로 적립'
+                      : '예: 15일 와퍼 6000 요기요 3000'
+                  }
                   className="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
                 <button
                   type="button"
                   onClick={() => handleApplyQuickText()}
                   disabled={isAiRunning}
-                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-95 transition"
+                  className={`px-3 py-2 disabled:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-95 transition ${
+                    inputMode === 'ai'
+                      ? 'bg-indigo-600 hover:bg-indigo-500'
+                      : 'bg-slate-700 hover:bg-slate-600'
+                  }`}
                 >
                   {isAiRunning ? (
                     <>
@@ -288,11 +331,25 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                   className={`mt-2 p-2 rounded-xl text-[11px] border leading-relaxed ${
                     aiNotice.kind === 'ok'
                       ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
-                      : 'bg-amber-950/40 border-amber-500/30 text-amber-200'
+                      : aiNotice.kind === 'warn'
+                      ? 'bg-amber-950/40 border-amber-500/30 text-amber-200'
+                      : 'bg-rose-950/40 border-rose-500/30 text-rose-200'
                   }`}
                 >
                   {aiNotice.kind === 'ok' && <strong className="mr-1">계산 근거:</strong>}
                   {aiNotice.text}
+                  {aiNotice.kind === 'error' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputMode('basic');
+                        setAiNotice(null);
+                      }}
+                      className="mt-1.5 block px-2 py-1 rounded-lg bg-slate-800 border border-slate-600 text-[11px] font-semibold text-slate-200 hover:text-white transition active:scale-95"
+                    >
+                      기본 입력으로 전환
+                    </button>
+                  )}
                 </div>
               )}
             </div>
