@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
 import { AppState } from '../types';
-import { Copy, Download, Upload, RotateCcw, ShieldCheck, Check, Smartphone, History, Trash2 } from 'lucide-react';
+import { Copy, Download, Upload, RotateCcw, ShieldCheck, Check, Smartphone, History, Trash2, Sparkles, Eye, EyeOff, Loader2, AlertTriangle } from 'lucide-react';
+import {
+  AiConfig,
+  DEFAULT_AI_MODEL,
+  KNOWN_MODELS,
+  KeyTestResult,
+  loadAiConfig,
+  saveAiConfig,
+  clearAiConfig,
+  hasApiKey,
+  maskApiKey,
+  testApiKey
+} from '../utils/ai';
 import {
   exportBackupJson,
   parseBackupJson,
@@ -27,6 +39,52 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState(false);
   const [snapshots, setSnapshots] = useState<StateSnapshot[]>(() => listSnapshots());
+
+  // AI 설정
+  const [aiConfig, setAiConfig] = useState<AiConfig>(() => loadAiConfig());
+  const [keyDraft, setKeyDraft] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<KeyTestResult | null>(null);
+
+  const savedKey = hasApiKey(aiConfig);
+
+  const handleSaveKey = () => {
+    const apiKey = keyDraft.trim();
+    if (!apiKey) return;
+    const next = { ...aiConfig, apiKey };
+    if (!saveAiConfig(next)) {
+      setTestResult({ ok: false, message: '설정을 저장하지 못했습니다. 저장 공간을 확인해 주세요.' });
+      return;
+    }
+    setAiConfig(next);
+    setKeyDraft('');
+    setShowKey(false);
+    setTestResult(null);
+  };
+
+  const handleModelChange = (model: string) => {
+    const next = { ...aiConfig, model };
+    setAiConfig(next);
+    if (savedKey) saveAiConfig(next);
+    setTestResult(null);
+  };
+
+  const handleTestKey = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    const result = await testApiKey({ ...aiConfig, apiKey: keyDraft.trim() || aiConfig.apiKey });
+    setTestResult(result);
+    setIsTesting(false);
+  };
+
+  const handleDeleteKey = () => {
+    if (!window.confirm('저장된 API 키를 삭제할까요? 가계부 데이터는 그대로 유지됩니다.')) return;
+    clearAiConfig();
+    setAiConfig({ apiKey: '', model: aiConfig.model });
+    setKeyDraft('');
+    setTestResult(null);
+  };
 
   // Copy to clipboard
   const handleCopy = async () => {
@@ -261,6 +319,159 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
               텍스트로 데이터 복원하기
             </button>
           )}
+        </div>
+      </div>
+
+      {/* AI (Gemini) */}
+      <div className="bg-slate-900/80 rounded-2xl p-4 border border-indigo-500/30 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-indigo-400" />
+            <h4 className="text-xs font-bold text-white">AI 연동 (Gemini)</h4>
+          </div>
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+              savedKey
+                ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60'
+                : 'bg-slate-800 text-slate-400 border-slate-700'
+            }`}
+          >
+            {savedKey ? '연결됨' : '꺼짐'}
+          </span>
+        </div>
+
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          키를 넣으면 자연어 입력 인식에 AI를 쓸 수 있습니다. 넣지 않으면 지금처럼
+          기기 안에서만 동작합니다.
+        </p>
+
+        {savedKey ? (
+          <div className="bg-slate-800/60 rounded-xl p-2.5 border border-slate-700/60 flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] text-slate-400 block">저장된 키</span>
+              <code className="text-[11px] text-slate-200 font-mono break-all">
+                {maskApiKey(aiConfig.apiKey)}
+              </code>
+            </div>
+            <button
+              onClick={handleDeleteKey}
+              className="p-1.5 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 hover:text-rose-400 transition active:scale-95 shrink-0"
+              title="키 삭제"
+              aria-label="키 삭제"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="relative">
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={keyDraft}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              placeholder="AI Studio에서 발급한 API 키 붙여넣기"
+              autoComplete="off"
+              spellCheck={false}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(!showKey)}
+              className="absolute right-2.5 top-2.5 p-1 text-slate-500 hover:text-slate-300"
+              aria-label={showKey ? '키 가리기' : '키 보기'}
+            >
+              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        )}
+
+        {/* 모델 선택 */}
+        <div>
+          <label className="block text-[11px] font-medium text-slate-400 mb-1">모델</label>
+          <input
+            type="text"
+            value={aiConfig.model}
+            onChange={(e) => handleModelChange(e.target.value)}
+            list="ai-model-options"
+            placeholder={DEFAULT_AI_MODEL}
+            spellCheck={false}
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+          />
+          <datalist id="ai-model-options">
+            {KNOWN_MODELS.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {!savedKey && (
+            <button
+              onClick={handleSaveKey}
+              disabled={!keyDraft.trim()}
+              className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-xs font-bold text-white transition active:scale-95"
+            >
+              키 저장
+            </button>
+          )}
+          <button
+            onClick={handleTestKey}
+            disabled={isTesting || (!savedKey && !keyDraft.trim())}
+            className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:text-slate-600 border border-slate-700 text-xs font-semibold text-slate-200 transition active:scale-95 flex items-center justify-center gap-1.5"
+          >
+            {isTesting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>확인 중…</span>
+              </>
+            ) : (
+              <span>연결 테스트</span>
+            )}
+          </button>
+        </div>
+
+        {testResult && (
+          <div
+            className={`p-2.5 rounded-xl text-[11px] border space-y-1.5 ${
+              testResult.ok && testResult.modelAvailable
+                ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300'
+                : testResult.ok
+                ? 'bg-amber-950/50 border-amber-500/40 text-amber-300'
+                : 'bg-rose-950/50 border-rose-500/40 text-rose-300'
+            }`}
+          >
+            <span className="block">{testResult.message}</span>
+            {testResult.ok && !testResult.modelAvailable && testResult.availableFlashModels?.length ? (
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {testResult.availableFlashModels.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => handleModelChange(m)}
+                    className="px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-[10px] font-mono text-slate-300 hover:text-white transition"
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        <div className="bg-amber-950/20 border border-amber-800/40 rounded-xl p-2.5 space-y-1">
+          <div className="flex items-center gap-1.5 text-amber-400">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-[11px] font-bold">키 취급 주의</span>
+          </div>
+          <ul className="text-[10px] text-slate-400 space-y-0.5 pl-4 list-disc leading-relaxed">
+            <li>
+              키는 이 기기 브라우저에만 저장되며 <strong className="text-slate-300">백업 파일에는 포함되지 않습니다</strong>
+            </li>
+            <li>
+              개발자 도구를 열면 키가 보입니다. <strong className="text-slate-300">결제를 연결하지 않은 무료 키</strong>를
+              쓰면 유출되어도 금전 피해가 없습니다
+            </li>
+            <li>AI Studio에서 키에 API 제한을 걸어두면 더 안전합니다</li>
+            <li>AI 기능을 쓰면 입력한 문장이 Google 서버로 전송됩니다 (월급·저축 정보는 보내지 않습니다)</li>
+          </ul>
         </div>
       </div>
 
