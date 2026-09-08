@@ -20,7 +20,7 @@ export const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
 
   const [activeTab, setActiveTab] = useState<'calendar' | 'salary' | 'settings'>('calendar');
-  const [listFilterMode, setListFilterMode] = useState<'selectedDate' | 'allMonth'>('allMonth');
+  const [listFilterMode, setListFilterMode] = useState<'selectedDate' | 'allMonth'>('selectedDate');
 
   // Modal states
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
