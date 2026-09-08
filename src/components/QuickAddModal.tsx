@@ -118,10 +118,19 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       setBenefitType(parsed.benefitType);
       setBenefitAmount(parsed.benefitAmount > 0 ? String(parsed.benefitAmount) : '');
       setDealTag(parsed.dealTag);
-      if (parsed.breakdown) {
-        setMemo(parsed.breakdown);
-        setAiNotice({ kind: 'ok', text: parsed.breakdown });
-      }
+      if (parsed.breakdown) setMemo(parsed.breakdown);
+      setAiNotice(
+        parsed.fallbackReason
+          ? {
+              kind: 'warn',
+              text: `${parsed.fallbackReason} → ${parsed.modelUsed}로 처리했습니다.${
+                parsed.breakdown ? ` (${parsed.breakdown})` : ''
+              }`
+            }
+          : parsed.breakdown
+          ? { kind: 'ok', text: parsed.breakdown }
+          : null
+      );
     } catch (err) {
       const message =
         err instanceof AiError ? err.message : 'AI 인식에 실패했습니다.';

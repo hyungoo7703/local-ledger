@@ -81,7 +81,7 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
   const handleDeleteKey = () => {
     if (!window.confirm('저장된 API 키를 삭제할까요? 가계부 데이터는 그대로 유지됩니다.')) return;
     clearAiConfig();
-    setAiConfig({ apiKey: '', model: aiConfig.model });
+    setAiConfig({ ...aiConfig, apiKey: '' });
     setKeyDraft('');
     setTestResult(null);
   };
@@ -401,6 +401,26 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
               <option key={m} value={m} />
             ))}
           </datalist>
+        </div>
+
+        {/* 대체 모델 */}
+        <div>
+          <label className="block text-[11px] font-medium text-slate-400 mb-1">
+            대체 모델 <span className="text-slate-500">(기본 모델이 은퇴·한도초과·과부하일 때)</span>
+          </label>
+          <input
+            type="text"
+            value={aiConfig.fallbackModel}
+            onChange={(e) => {
+              const next = { ...aiConfig, fallbackModel: e.target.value };
+              setAiConfig(next);
+              if (savedKey) saveAiConfig(next);
+            }}
+            list="ai-model-options"
+            placeholder="비워두면 폴백하지 않음"
+            spellCheck={false}
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+          />
         </div>
 
         <div className="flex items-center gap-2">

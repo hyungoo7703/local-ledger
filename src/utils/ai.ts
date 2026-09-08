@@ -13,12 +13,20 @@ export const KNOWN_MODELS = [
   'gemini-3.5-flash-lite'
 ];
 
+export const DEFAULT_FALLBACK_MODEL = 'gemini-3.7-flash';
+
 export interface AiConfig {
   apiKey: string;
   model: string;
+  /** 기본 모델이 은퇴·한도초과·과부하일 때 쓸 모델. 빈 문자열이면 폴백하지 않는다 */
+  fallbackModel: string;
 }
 
-export const EMPTY_AI_CONFIG: AiConfig = { apiKey: '', model: DEFAULT_AI_MODEL };
+export const EMPTY_AI_CONFIG: AiConfig = {
+  apiKey: '',
+  model: DEFAULT_AI_MODEL,
+  fallbackModel: DEFAULT_FALLBACK_MODEL
+};
 
 /**
  * AI 설정은 가계부 본체(LOCAL_LEDGER_DATA_V3)와 다른 키에 저장한다.
@@ -34,7 +42,11 @@ export function loadAiConfig(): AiConfig {
       apiKey: typeof parsed?.apiKey === 'string' ? parsed.apiKey.trim() : '',
       model: typeof parsed?.model === 'string' && parsed.model.trim() !== ''
         ? parsed.model.trim()
-        : DEFAULT_AI_MODEL
+        : DEFAULT_AI_MODEL,
+      // 기존 설정에는 이 항목이 없으므로 기본값을 채운다
+      fallbackModel: typeof parsed?.fallbackModel === 'string'
+        ? parsed.fallbackModel.trim()
+        : DEFAULT_FALLBACK_MODEL
     };
   } catch (err) {
     console.error('Failed to load AI config', err);
@@ -136,7 +148,10 @@ export async function testApiKey(
   };
 }
 
-export type AiErrorKind = 'key' | 'quota' | 'network' | 'parse' | 'other';
+export type AiErrorKind = 'key' | 'quota' | 'model' | 'busy' | 'network' | 'parse' | 'other';
+
+/** 모델을 바꿔 다시 시도할 가치가 있는 실패인지. 키·네트워크 문제는 바꿔도 소용없다. */
+const RETRY_WITH_OTHER_MODEL: AiErrorKind[] = ['model', 'quota', 'busy'];
 
 export class AiError extends Error {
   constructor(message: string, public kind: AiErrorKind) {
@@ -154,6 +169,10 @@ export interface AiParseResult {
   dealTag: string;
   /** 계산 근거. 사용자가 눈으로 검산할 수 있도록 UI와 메모에 노출한다 */
   breakdown: string;
+  /** 실제로 응답한 모델. 폴백이 일어났는지 사용자가 알 수 있어야 한다 */
+  modelUsed: string;
+  /** 기본 모델이 실패해 폴백한 경우 그 사유 */
+  fallbackReason?: string;
 }
 
 // 산술은 AI에게 맡기지 않는다. 읽어낸 조각만 받아서 계산은 아래 코드가 한다.
@@ -214,15 +233,45 @@ function buildPrompt(input: string, today: string, quickTags: string[]): string 
   ].join('\n');
 }
 
+/**
+ * 기본 모델로 시도하고, 모델이 은퇴했거나(404) 한도 초과(429)·과부하(503)면
+ * 대체 모델로 한 번 더 시도한다. 키·네트워크 오류는 모델을 바꿔도 소용없으므로 즉시 포기한다.
+ */
 export async function parseEntryWithGemini(
   input: string,
   ctx: { config: AiConfig; today: string; quickTags: string[] },
   signal?: AbortSignal
 ): Promise<AiParseResult> {
-  const apiKey = ctx.config.apiKey.trim();
-  if (!apiKey) throw new AiError('API 키가 설정되지 않았습니다.', 'key');
+  if (!ctx.config.apiKey.trim()) throw new AiError('API 키가 설정되지 않았습니다.', 'key');
 
-  const model = ctx.config.model.trim() || DEFAULT_AI_MODEL;
+  const primary = ctx.config.model.trim() || DEFAULT_AI_MODEL;
+  const fallback = ctx.config.fallbackModel?.trim() ?? '';
+  const chain = fallback && fallback !== primary ? [primary, fallback] : [primary];
+
+  let firstError: AiError | null = null;
+  for (const model of chain) {
+    try {
+      const result = await requestEntry(input, model, ctx, signal);
+      return firstError
+        ? { ...result, fallbackReason: `${primary} 실패: ${firstError.message}` }
+        : result;
+    } catch (err) {
+      const aiErr = err instanceof AiError ? err : new AiError('AI 인식에 실패했습니다.', 'other');
+      if (!firstError) firstError = aiErr;
+      if (!RETRY_WITH_OTHER_MODEL.includes(aiErr.kind)) throw aiErr;
+    }
+  }
+
+  throw firstError ?? new AiError('AI 인식에 실패했습니다.', 'other');
+}
+
+async function requestEntry(
+  input: string,
+  model: string,
+  ctx: { config: AiConfig; today: string; quickTags: string[] },
+  signal?: AbortSignal
+): Promise<AiParseResult> {
+  const apiKey = ctx.config.apiKey.trim();
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), 20000);
   if (signal) signal.addEventListener('abort', () => timeout.abort(), { once: true });
@@ -253,8 +302,7 @@ export async function parseEntryWithGemini(
   }
 
   if (!res.ok) {
-    const message = await describeError(res);
-    throw new AiError(message, res.status === 429 ? 'quota' : res.status === 403 ? 'key' : res.status === 400 ? 'key' : 'other');
+    throw new AiError(await describeError(res, model), errorKind(res.status));
   }
 
   let raw: any;
@@ -271,11 +319,19 @@ export async function parseEntryWithGemini(
     throw new AiError('AI 응답을 해석하지 못했습니다.', 'parse');
   }
 
-  return toEntry(raw, input);
+  return { ...toEntry(raw, input), modelUsed: model };
+}
+
+function errorKind(status: number): AiErrorKind {
+  if (status === 404) return 'model';
+  if (status === 429) return 'quota';
+  if (status === 400 || status === 403) return 'key';
+  if (status >= 500) return 'busy';
+  return 'other';
 }
 
 /** AI가 읽어낸 조각으로 최종 금액을 계산한다. 산술 환각을 구조적으로 배제하기 위함. */
-function toEntry(raw: any, input: string): AiParseResult {
+function toEntry(raw: any, input: string): Omit<AiParseResult, 'modelUsed'> {
   const num = (v: unknown) => {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? n : 0;
@@ -322,7 +378,7 @@ function toEntry(raw: any, input: string): AiParseResult {
   };
 }
 
-async function describeError(res: Response): Promise<string> {
+async function describeError(res: Response, model?: string): Promise<string> {
   let reason = '';
   let detail = '';
   try {
@@ -335,6 +391,11 @@ async function describeError(res: Response): Promise<string> {
 
   if (reason === 'API_KEY_INVALID' || res.status === 400) {
     return '유효하지 않은 API 키입니다. AI Studio에서 발급한 키를 다시 확인해 주세요.';
+  }
+  if (res.status === 404) {
+    return model
+      ? `'${model}' 모델을 찾을 수 없습니다. 은퇴했거나 이름이 잘못됐을 수 있습니다.`
+      : '모델을 찾을 수 없습니다.';
   }
   if (res.status === 403) {
     return '이 키로는 Gemini API를 쓸 수 없습니다. 키의 API 제한 설정을 확인해 주세요.';
