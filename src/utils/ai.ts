@@ -150,8 +150,11 @@ export async function testApiKey(
 
 export type AiErrorKind = 'key' | 'quota' | 'model' | 'busy' | 'network' | 'parse' | 'other';
 
-/** 모델을 바꿔 다시 시도할 가치가 있는 실패인지. 키·네트워크 문제는 바꿔도 소용없다. */
-const RETRY_WITH_OTHER_MODEL: AiErrorKind[] = ['model', 'quota', 'busy'];
+/**
+ * 모델을 바꿔 다시 시도할 가치가 있는 실패인지. 키·네트워크 문제는 바꿔도 소용없다.
+ * 'parse'는 모델이 스키마를 어긴 경우라 다른 모델에서는 성공할 수 있다.
+ */
+const RETRY_WITH_OTHER_MODEL: AiErrorKind[] = ['model', 'quota', 'busy', 'parse'];
 
 export class AiError extends Error {
   constructor(message: string, public kind: AiErrorKind) {
