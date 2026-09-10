@@ -65,8 +65,8 @@ export function parseQuickEntry(
 
   // 2. 할인/적립 금액 명시 패턴 추출 (예: "청구할인 2000", "적립 24000", "할인 3000", "-3000")
   let benefitAmount = 0;
-  const explicitBenefitMatch = text.match(/(?:청구할인|결제일할인|적립|캐시백|할인\s*[:=]?\s*|-)(\d+(?:,\d{3})*|\d+만)(?:원)?/i)
-    || text.match(/(\d+(?:,\d{3})*|\d+만)(?:원)?\s*(?:청구할인|적립|캐시백|할인)/i);
+  const explicitBenefitMatch = text.match(/(?:청구할인|결제일할인|적립|캐시백|할인\s*[:=]?\s*|-)(\d+만|\d+(?:,\d{3})*)(?:원)?/i)
+    || text.match(/(\d+만|\d+(?:,\d{3})*)(?:원)?\s*(?:청구할인|적립|캐시백|할인)/i);
 
   if (explicitBenefitMatch) {
     benefitAmount = parseAmount(explicitBenefitMatch[1]);
@@ -91,21 +91,18 @@ export function parseQuickEntry(
   }
 
   // 4. 남은 숫자들 추출 (결제 금액 및 남은 혜택금액 처리)
-  const numberMatches = Array.from(text.matchAll(/(\d+(?:,\d{3})*|\d+만)(?:원)?/g));
+  const amounts = extractAmounts(text);
   let finalPrice = 0;
 
-  if (numberMatches.length > 0) {
-    if (numberMatches.length >= 2 && benefitAmount === 0) {
-      const p1 = parseAmount(numberMatches[0][1]);
-      const p2 = parseAmount(numberMatches[1][1]);
-      finalPrice = p1;
-      benefitAmount = p2;
+  if (amounts.length > 0) {
+    const used = [amounts[0]];
+    finalPrice = amounts[0].value;
+    if (amounts.length >= 2 && benefitAmount === 0) {
+      benefitAmount = amounts[1].value;
       if (benefitType === 'instant') benefitType = 'bill_discount';
-      text = text.replace(numberMatches[0][0], ' ').replace(numberMatches[1][0], ' ').trim();
-    } else {
-      finalPrice = parseAmount(numberMatches[0][1]);
-      text = text.replace(numberMatches[0][0], ' ').trim();
+      used.push(amounts[1]);
     }
+    text = cutOut(text, used);
   }
 
   // 5. 남은 텍스트는 제목
@@ -129,6 +126,50 @@ export function parseQuickEntry(
     benefitAmount,
     dealTag: dealTag || ''
   };
+}
+
+interface Amount {
+  value: number;
+  start: number;
+  end: number;
+}
+
+// '만'을 먼저 두지 않으면 "3만"에서 앞쪽 대안이 "3"만 먹고 "만"을 흘린다
+const AMOUNT_PATTERN = /(\d+만|\d+(?:,\d{3})*)(원)?/g;
+const HANGUL_OR_LETTER = /[가-힣A-Za-z]/;
+
+/**
+ * 금액으로 볼 수 있는 숫자만 뽑는다.
+ *
+ * "11번가"의 11이나 "3인"의 3처럼 낱말에 붙은 숫자는 금액이 아니다.
+ * 단 "3만", "4500원"처럼 단위가 붙었으면 뒤에 글자가 이어져도 금액으로 본다
+ * ("49700원이었어" 같은 입력을 놓치지 않기 위함).
+ */
+function extractAmounts(text: string): Amount[] {
+  const amounts: Amount[] = [];
+  for (const match of text.matchAll(AMOUNT_PATTERN)) {
+    const raw = match[1];
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    const hasUnit = Boolean(match[2]) || raw.endsWith('만');
+
+    if (!hasUnit) {
+      const before = text[start - 1] ?? '';
+      const after = text[end] ?? '';
+      if (HANGUL_OR_LETTER.test(before) || HANGUL_OR_LETTER.test(after)) continue;
+    }
+    amounts.push({ value: parseAmount(raw), start, end });
+  }
+  return amounts;
+}
+
+/** 위치 기준으로 잘라낸다. 문자열 replace를 쓰면 "11번가 11"처럼 같은 숫자가 앞에 또 있을 때 엉뚱한 곳을 지운다. */
+function cutOut(text: string, ranges: Amount[]): string {
+  let out = text;
+  for (const { start, end } of [...ranges].sort((a, b) => b.start - a.start)) {
+    out = `${out.slice(0, start)} ${out.slice(end)}`;
+  }
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 function parseAmount(str: string): number {
