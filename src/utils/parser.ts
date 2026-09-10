@@ -20,6 +20,18 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// 금액 표기는 아래 한 곳에서만 정의한다.
+// 예전에 이 정의가 세 군데 흩어져 있어 '만' 처리 버그가 각각 따로 존재했다.
+const AMOUNT_SOURCE = String.raw`\d+만\s*\d+천|\d+만|\d+천|\d+(?:,\d{3})*`;
+const BENEFIT_BEFORE_AMOUNT = new RegExp(
+  String.raw`(?:청구할인|결제일할인|적립|캐시백|할인\s*[:=]?\s*|-)(${AMOUNT_SOURCE})(?:원)?`,
+  'i'
+);
+const BENEFIT_AFTER_AMOUNT = new RegExp(
+  String.raw`(${AMOUNT_SOURCE})(?:원)?\s*(?:청구할인|적립|캐시백|할인)`,
+  'i'
+);
+
 /**
  * 자연어 한 줄 입력 파서
  * 예시 입력:
@@ -65,8 +77,7 @@ export function parseQuickEntry(
 
   // 2. 할인/적립 금액 명시 패턴 추출 (예: "청구할인 2000", "적립 24000", "할인 3000", "-3000")
   let benefitAmount = 0;
-  const explicitBenefitMatch = text.match(/(?:청구할인|결제일할인|적립|캐시백|할인\s*[:=]?\s*|-)(\d+만|\d+(?:,\d{3})*)(?:원)?/i)
-    || text.match(/(\d+만|\d+(?:,\d{3})*)(?:원)?\s*(?:청구할인|적립|캐시백|할인)/i);
+  const explicitBenefitMatch = text.match(BENEFIT_BEFORE_AMOUNT) || text.match(BENEFIT_AFTER_AMOUNT);
 
   if (explicitBenefitMatch) {
     benefitAmount = parseAmount(explicitBenefitMatch[1]);
@@ -134,8 +145,9 @@ interface Amount {
   end: number;
 }
 
-// '만'을 먼저 두지 않으면 "3만"에서 앞쪽 대안이 "3"만 먹고 "만"을 흘린다
-const AMOUNT_PATTERN = /(\d+만|\d+(?:,\d{3})*)(원)?/g;
+// 긴 형태를 먼저 두어야 한다. "3만"에서 앞쪽 대안이 "3"만 먹고 "만"을 흘리거나,
+// "1만5천"이 "1만"과 "5천" 두 금액으로 쪼개지는 것을 막는다 (AMOUNT_SOURCE 참고).
+const AMOUNT_PATTERN = new RegExp(`(${AMOUNT_SOURCE})(원)?`, 'g');
 const HANGUL_OR_LETTER = /[가-힣A-Za-z]/;
 
 /**
@@ -151,7 +163,7 @@ function extractAmounts(text: string): Amount[] {
     const raw = match[1];
     const start = match.index ?? 0;
     const end = start + match[0].length;
-    const hasUnit = Boolean(match[2]) || raw.endsWith('만');
+    const hasUnit = Boolean(match[2]) || /[만천]/.test(raw);
 
     if (!hasUnit) {
       const before = text[start - 1] ?? '';
@@ -174,9 +186,14 @@ function cutOut(text: string, ranges: Amount[]): string {
 
 function parseAmount(str: string): number {
   if (!str) return 0;
-  if (str.endsWith('만')) {
-    const num = parseFloat(str.replace('만', '').trim());
-    return Math.round(num * 10000);
-  }
-  return parseInt(str.replace(/,/g, '').trim(), 10) || 0;
+  const trimmed = str.trim();
+
+  // "1만5천"처럼 붙여 쓰는 형태
+  const manCheon = trimmed.match(/^(\d+)만\s*(\d+)천$/);
+  if (manCheon) return Number(manCheon[1]) * 10000 + Number(manCheon[2]) * 1000;
+
+  if (trimmed.endsWith('만')) return Math.round(parseFloat(trimmed.slice(0, -1)) * 10000) || 0;
+  if (trimmed.endsWith('천')) return Math.round(parseFloat(trimmed.slice(0, -1)) * 1000) || 0;
+
+  return parseInt(trimmed.replace(/,/g, ''), 10) || 0;
 }
