@@ -9,7 +9,7 @@ import { DealList } from './components/DealList';
 import { SalaryRules } from './components/SalaryRules';
 import { BackupSettingsModal } from './components/BackupSettingsModal';
 import { QuickAddModal } from './components/QuickAddModal';
-import { Plus } from 'lucide-react';
+import { Plus, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(() => loadAppState());
@@ -26,9 +26,12 @@ export const App: React.FC = () => {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [editDealItem, setEditDealItem] = useState<DealItem | null>(null);
 
-  // Auto save to localStorage whenever appState changes
+  // 저장 실패를 조용히 넘기면 앱은 정상처럼 보이면서 아무것도 남지 않는다.
+  // 용량 초과나 시크릿 모드에서 실제로 일어나므로 화면에 알려야 한다.
+  const [isSaveFailing, setIsSaveFailing] = useState(false);
+
   useEffect(() => {
-    saveAppState(appState);
+    setIsSaveFailing(!saveAppState(appState));
   }, [appState]);
 
   // Filter deals for the current selected year & month
@@ -152,6 +155,28 @@ export const App: React.FC = () => {
           setSelectedDate(getTodayString());
         }}
       />
+
+      {/* 저장 실패 경고. 데이터를 잃을 수 있는 상황이라 닫을 수 없게 둔다. */}
+      {isSaveFailing && (
+        <div className="sticky top-0 z-20 bg-rose-950/95 backdrop-blur-sm border-b border-rose-700/60 px-4 py-2.5">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-300 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-rose-200">저장되지 않고 있습니다</p>
+              <p className="text-[11px] text-rose-300/90 leading-relaxed mt-0.5">
+                저장 공간이 가득 찼거나 브라우저가 저장을 막고 있습니다. 지금 입력한 내용은
+                앱을 닫으면 사라집니다.
+              </p>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className="mt-1.5 px-2.5 py-1 rounded-lg bg-rose-900/80 border border-rose-600/60 text-[11px] font-semibold text-rose-100 hover:bg-rose-900 transition active:scale-95"
+              >
+                지금 백업 파일로 내보내기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 p-4 space-y-4 pb-24 overflow-y-auto">
