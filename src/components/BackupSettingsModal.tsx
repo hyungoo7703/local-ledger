@@ -24,15 +24,18 @@ import {
   resetToDefault,
   StateSnapshot
 } from '../utils/storage';
+import { PersistState } from '../utils/persistence';
 
 interface BackupSettingsProps {
   appState: AppState;
   onStateChange: (newState: AppState) => void;
+  persistState: PersistState;
 }
 
 export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
   appState,
-  onStateChange
+  onStateChange,
+  persistState
 }) => {
   const [copySuccess, setCopySuccess] = useState(false);
   const [importText, setImportText] = useState('');
@@ -240,6 +243,43 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
           ⚠️ 기기 변경이나 브라우저 쿠키/캐시 정리 시 데이터가 지워질 수 있으니, 중요한 내역은 아래
           백업 버튼을 통해 주기적으로 복사해 두세요!
         </p>
+
+        {/* 자동 삭제 방지 상태. 사용자가 직접 지우는 것은 어차피 막지 못하므로 과장하지 않는다 */}
+        {persistState !== 'checking' && (
+          <div
+            className={`flex items-start gap-2 text-[11px] leading-relaxed rounded-xl p-2.5 border ${
+              persistState === 'persisted'
+                ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
+                : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+            }`}
+          >
+            {persistState === 'persisted' ? (
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-400" />
+            ) : (
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-400" />
+            )}
+            <span>
+              {persistState === 'persisted' ? (
+                <>
+                  <strong className="text-emerald-300">자동 삭제 방지 켜짐.</strong> 기기 용량이 부족해도
+                  브라우저가 이 앱의 데이터를 먼저 비우지 않습니다. 단 직접 사이트 데이터를 지우거나
+                  앱을 삭제하면 그대로 사라집니다.
+                </>
+              ) : persistState === 'unsupported' ? (
+                <>
+                  이 브라우저는 <strong className="text-slate-200">자동 삭제 방지</strong>를 지원하지 않습니다.
+                  백업 파일이 유일한 복구 수단입니다.
+                </>
+              ) : (
+                <>
+                  <strong className="text-amber-300">자동 삭제 방지가 거절됐습니다.</strong> 기기 용량이
+                  부족해지면 브라우저가 예고 없이 데이터를 비울 수 있습니다. 홈 화면에 앱으로 설치하면
+                  보통 허가됩니다.
+                </>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Backup Actions */}

@@ -8,6 +8,7 @@ import {
   calculateCreditSpendWon
 } from './utils/storage';
 import { getTodayString } from './utils/formatters';
+import { requestPersistentStorage, PersistState } from './utils/persistence';
 import { Header } from './components/Header';
 import { StatsCard } from './components/StatsCard';
 import { DealCalendar } from './components/DealCalendar';
@@ -39,6 +40,19 @@ export const App: React.FC = () => {
   useEffect(() => {
     setIsSaveFailing(!saveAppState(appState));
   }, [appState]);
+
+  // 용량이 빠듯할 때 브라우저가 저장소를 통째로 비우는 것을 막아달라고 한 번 요청한다.
+  // 거절당해도 지금과 같은 상태일 뿐이라 실패를 막지 않는다.
+  const [persistState, setPersistState] = useState<PersistState>('checking');
+  useEffect(() => {
+    let alive = true;
+    requestPersistentStorage().then((state) => {
+      if (alive) setPersistState(state);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Filter deals for the current selected year & month
   const monthPrefix = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
@@ -276,6 +290,7 @@ export const App: React.FC = () => {
           <BackupSettingsModal
             appState={appState}
             onStateChange={setAppState}
+            persistState={persistState}
           />
         )}
       </main>
