@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { SalaryConfig, SalaryDeductionItem, MonthlyChecklistItem } from '../types';
-import { PiggyBank, Plus, Trash2, ShoppingBag, Landmark, ArrowRight, Check, AlertCircle, ListChecks, CheckSquare, Square, RefreshCw, X } from 'lucide-react';
+import { PiggyBank, Plus, Trash2, ShoppingBag, Landmark, ArrowRight, Check, AlertCircle, ListChecks, CheckSquare, Square, RefreshCw, X, CreditCard, AlertTriangle } from 'lucide-react';
 import { formatCompactKRW, generateId } from '../utils/formatters';
-import { calculateRemainingSalary, calculateSpendingLimitManwon, calculateTotalDeductions } from '../utils/storage';
+import { calculateCreditLimitManwon, calculateRemainingSalary, calculateSpendingLimitManwon, calculateTotalDeductions } from '../utils/storage';
 
 interface SalaryRulesProps {
   config: SalaryConfig;
   currentPlannedDealsSpend: number; // in KRW (원)
   totalPostBenefits?: number; // in KRW (원) 혜택 총액 (청구할인 + 적립)
+  currentCreditSpend?: number; // in KRW (원) 이번 달 신용 결제 합계
   onUpdateConfig: (newConfig: SalaryConfig) => void;
 }
 
@@ -18,12 +19,16 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   config,
   currentPlannedDealsSpend,
   totalPostBenefits = 0,
+  currentCreditSpend = 0,
   onUpdateConfig
 }) => {
   const [baseSalaryInput, setBaseSalaryInput] = useState<string>(
     config.baseSalaryManwon ? String(config.baseSalaryManwon) : ''
   );
   const [payday, setPayday] = useState<number>(config.payday || 25);
+  const [creditLimitInput, setCreditLimitInput] = useState<string>(
+    config.creditLimitManwon ? String(config.creditLimitManwon) : ''
+  );
   const [deductions, setDeductions] = useState<SalaryDeductionItem[]>(config.deductions || []);
   const [checklist, setChecklist] = useState<MonthlyChecklistItem[]>(config.checklist || []);
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
@@ -40,26 +45,48 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   React.useEffect(() => {
     setBaseSalaryInput(config.baseSalaryManwon ? String(config.baseSalaryManwon) : '');
     setPayday(config.payday || 25);
+    setCreditLimitInput(config.creditLimitManwon ? String(config.creditLimitManwon) : '');
     setDeductions(config.deductions || []);
     setChecklist(config.checklist || []);
   }, [config]);
 
   const baseSalaryManwon = parseInt(baseSalaryInput, 10) || 0;
+  const rawCreditLimitManwon = parseInt(creditLimitInput, 10) || 0;
   const currentConfig: SalaryConfig = {
     baseSalaryManwon,
     payday,
-    deductions
+    deductions,
+    creditLimitManwon: rawCreditLimitManwon
   };
 
   const totalDeductionsManwon = calculateTotalDeductions(currentConfig);
   const remainingManwon = calculateRemainingSalary(currentConfig);
   const spendingLimitManwon = calculateSpendingLimitManwon(currentConfig);
   const spendingLimitWon = spendingLimitManwon * 10000;
+  const creditLimitManwon = calculateCreditLimitManwon(currentConfig);
+  const creditLimitWon = creditLimitManwon * 10000;
+  const isCreditClamped = rawCreditLimitManwon > spendingLimitManwon;
+  const isCreditOver = creditLimitWon > 0 && currentCreditSpend > creditLimitWon;
 
   // Carry the whole form state on every update. Otherwise the sync effect above
   // reverts an in-progress salary edit as soon as any other field changes.
   const commit = (patch: Partial<SalaryConfig>) => {
-    onUpdateConfig({ baseSalaryManwon, payday, deductions, checklist, ...patch });
+    onUpdateConfig({
+      baseSalaryManwon,
+      payday,
+      deductions,
+      checklist,
+      creditLimitManwon: rawCreditLimitManwon,
+      ...patch
+    });
+  };
+
+  // 한계 소비보다 큰 신용 한도는 의미가 없다. 입력에서 바로 잘라 사용자가 결과를 눈으로 보게 한다.
+  const handleCreditLimitBlur = () => {
+    const raw = parseInt(creditLimitInput.replace(/\D/g, ''), 10) || 0;
+    const clamped = Math.min(raw, spendingLimitManwon);
+    setCreditLimitInput(clamped > 0 ? String(clamped) : '');
+    commit({ creditLimitManwon: clamped });
   };
 
   const handleSalaryBlur = () => {
@@ -375,6 +402,80 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
               }}
             />
           </div>
+        </div>
+      )}
+
+      {/* 신용 한도. 한계 소비 안쪽에서만 정할 수 있고 혜택으로 늘어나지 않는다 */}
+      {spendingLimitWon > 0 && (
+        <div
+          className={`rounded-xl p-3 border text-xs space-y-2 ${
+            isCreditOver ? 'bg-rose-950/30 border-rose-500/40' : 'bg-slate-900/80 border-amber-500/30'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1 font-semibold text-amber-300 whitespace-nowrap">
+              <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+              신용 한도
+            </span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={creditLimitInput}
+                onChange={(e) => setCreditLimitInput(e.target.value.replace(/\D/g, ''))}
+                onBlur={handleCreditLimitBlur}
+                placeholder="0"
+                className="w-16 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-right text-sm font-bold text-amber-300 placeholder-slate-600 focus:outline-none focus:border-amber-500 tabular-nums"
+              />
+              <span className="text-[11px] text-slate-400">만원</span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            한계 소비 {spendingLimitManwon}만원 안에서만 정할 수 있습니다. 혜택으로 소비 예산이 늘어도
+            신용 한도는 그대로입니다.
+          </p>
+
+          {isCreditClamped && (
+            <p className="text-[11px] text-amber-400 font-medium">
+              한계 소비를 넘을 수 없어 {spendingLimitManwon}만원으로 맞췄습니다.
+            </p>
+          )}
+
+          {creditLimitWon > 0 && (
+            <>
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="text-[11px] text-slate-400">이번 달 신용 결제</span>
+                <div className="text-right whitespace-nowrap">
+                  <span className={`font-bold ${isCreditOver ? 'text-rose-400' : 'text-white'}`}>
+                    {formatCompactKRW(currentCreditSpend)}
+                  </span>
+                  <span className="text-slate-400 text-[11px] ml-1">
+                    / {formatCompactKRW(creditLimitWon)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    isCreditOver ? 'bg-rose-500' : 'bg-amber-500'
+                  }`}
+                  style={{
+                    width: `${Math.min(100, Math.round((currentCreditSpend / creditLimitWon) * 100))}%`
+                  }}
+                />
+              </div>
+
+              {isCreditOver && (
+                <p className="flex items-start gap-1.5 text-[11px] text-rose-300 font-medium leading-relaxed">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  신용 {formatCompactKRW(currentCreditSpend - creditLimitWon)} 초과. 남은 소비는 계좌/체크로
+                  쓰세요.
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 

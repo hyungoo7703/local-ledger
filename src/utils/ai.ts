@@ -1,3 +1,4 @@
+import { PayMethod } from '../types';
 const AI_CONFIG_KEY = 'LOCAL_LEDGER_AI_CONFIG';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -170,6 +171,8 @@ export interface AiParseResult {
   benefitType: 'instant' | 'bill_discount' | 'point_reward';
   benefitAmount: number;
   dealTag: string;
+  /** 문장에 결제 수단 표기가 없으면 null. 이때는 화면의 현재 선택을 건드리지 않는다. */
+  payMethod: PayMethod | null;
   /** 계산 근거. 사용자가 눈으로 검산할 수 있도록 UI와 메모에 노출한다 */
   breakdown: string;
   /** 실제로 응답한 모델. 폴백이 일어났는지 사용자가 알 수 있어야 한다 */
@@ -195,7 +198,13 @@ const ENTRY_SCHEMA = {
     },
     benefitPercent: { type: 'number', description: '비율로 표현된 혜택(%). 없으면 0' },
     benefitAmount: { type: 'number', description: '금액으로 표현된 혜택(원). 없으면 0' },
-    dealTag: { type: 'string', description: '행사/혜택 태그. 없으면 빈 문자열' }
+    dealTag: { type: 'string', description: '행사/혜택 태그. 없으면 빈 문자열' },
+    payMethod: {
+      type: 'string',
+      enum: ['debit', 'credit', 'unknown'],
+      description:
+        'debit=계좌/체크/현금/이체, credit=신용카드/할부, unknown=문장에 언급이 없음. 추측하지 말고 언급이 없으면 unknown'
+    }
   },
   required: [
     'title',
@@ -206,7 +215,8 @@ const ENTRY_SCHEMA = {
     'benefitType',
     'benefitPercent',
     'benefitAmount',
-    'dealTag'
+    'dealTag',
+    'payMethod'
   ]
 };
 
@@ -222,6 +232,9 @@ function buildPrompt(input: string, today: string, quickTags: string[]): string 
     '- "인당 49700원, 3인"이면 unitPrice=49700, quantity=3, totalPrice=0 이다. 149100을 계산해 넣지 마라.',
     '- "40프로 적립"이면 benefitPercent=40, benefitAmount=0 이다.',
     '- "3000원 할인"이면 benefitAmount=3000, benefitPercent=0 이다.',
+    '',
+    '결제 수단 판단: "신용", "신용카드", "할부"면 credit. "체크", "체크카드", "계좌", "이체", "현금"이면 debit.',
+    '언급이 전혀 없으면 payMethod는 unknown이다. 가게 이름이나 카드사 이름만 보고 추측하지 마라.',
     '',
     '혜택 유형 판단:',
     '- 쿠폰, 즉시할인, 세일가처럼 결제 시점에 이미 깎인 것 -> instant',
@@ -368,6 +381,12 @@ function toEntry(raw: any, input: string): Omit<AiParseResult, 'modelUsed'> {
     parts.push(percent > 0 ? `${percent}% ${label} = ${won(benefitAmount)}원` : `${label} ${won(benefitAmount)}원`);
   }
 
+  // 'unknown'이나 빠진 값은 null로 둔다. 추측한 결제 수단을 화면에 밀어 넣으면
+  // 사용자가 고르지도 않은 값이 신용 한도 계산에 들어간다.
+  const payMethod: PayMethod | null =
+    raw?.payMethod === 'credit' ? 'credit' : raw?.payMethod === 'debit' ? 'debit' : null;
+  if (payMethod) parts.push(payMethod === 'credit' ? '신용' : '계좌/체크');
+
   const date = typeof raw?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.date) ? raw.date : '';
 
   return {
@@ -377,6 +396,7 @@ function toEntry(raw: any, input: string): Omit<AiParseResult, 'modelUsed'> {
     benefitType,
     benefitAmount,
     dealTag: String(raw?.dealTag ?? '').trim(),
+    payMethod,
     breakdown: parts.join(' · ')
   };
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Sparkles, Plus, Calendar, Tag, Check, ArrowRight, CreditCard, Coins, ShoppingBag, Loader2 } from 'lucide-react';
+import { X, Sparkles, Plus, Calendar, Tag, Check, ArrowRight, CreditCard, Coins, ShoppingBag, Loader2, Landmark, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { DealItem, BenefitType } from '../types';
+import { DealItem, BenefitType, PayMethod } from '../types';
 import { generateId, getTodayString, formatKRW } from '../utils/formatters';
 import { parseQuickEntry } from '../utils/parser';
 import { loadAiConfig, hasApiKey, parseEntryWithGemini, AiError } from '../utils/ai';
@@ -13,6 +13,10 @@ interface QuickAddModalProps {
   quickTags: string[];
   currentYear: number;
   currentMonth: number;
+  /** 신용 한도 (원). 0이면 한도를 두지 않은 상태 */
+  creditLimitWon: number;
+  /** 이번 달 신용 사용액 중 지금 편집 중인 건을 뺀 금액 (원) */
+  creditSpentOthersWon: number;
   onClose: () => void;
   onSave: (item: DealItem) => void;
   onDelete?: (id: string) => void;
@@ -27,6 +31,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   quickTags,
   currentYear,
   currentMonth,
+  creditLimitWon,
+  creditSpentOthersWon,
   onClose,
   onSave,
   onDelete,
@@ -38,6 +44,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [title, setTitle] = useState('');
   const [finalPrice, setFinalPrice] = useState<string>('');
   const [benefitType, setBenefitType] = useState<BenefitType>('instant');
+  const [payMethod, setPayMethod] = useState<PayMethod>('credit');
   const [benefitAmount, setBenefitAmount] = useState<string>('');
   const [dealTag, setDealTag] = useState('');
   const [memo, setMemo] = useState('');
@@ -55,6 +62,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         setDate(editItem.date);
         setTitle(editItem.title);
         setFinalPrice(editItem.finalPrice ? String(editItem.finalPrice) : '');
+        setPayMethod(editItem.payMethod === 'credit' ? 'credit' : 'debit');
         setBenefitType(editItem.benefitType || 'instant');
         setBenefitAmount(editItem.benefitAmount ? String(editItem.benefitAmount) : '');
         setDealTag(editItem.dealTag || '');
@@ -65,6 +73,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         setDate(defaultDate);
         setTitle('');
         setFinalPrice('');
+        // 새 플랜은 신용으로 시작한다. 신용을 계좌로 잘못 적으면 한도 경고가 아예 안 뜨지만,
+        // 반대로 적으면 경고가 한 번 더 뜰 뿐이다. 놓치는 쪽이 더 위험하다.
+        setPayMethod('credit');
         setBenefitType('instant');
         setBenefitAmount('');
         setDealTag('');
@@ -92,6 +103,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     setBenefitType(parsed.benefitType);
     setBenefitAmount(parsed.benefitAmount > 0 ? String(parsed.benefitAmount) : '');
     if (parsed.dealTag) setDealTag(parsed.dealTag);
+    // 문장에 표기가 없으면 지금 고른 값을 그대로 둔다
+    if (parsed.payMethod) setPayMethod(parsed.payMethod);
   };
 
   // 기본 모드는 정규식, AI 모드는 Gemini. AI가 실패해도 정규식으로 몰래 넘기지 않는다.
@@ -129,6 +142,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       setBenefitType(parsed.benefitType);
       setBenefitAmount(parsed.benefitAmount > 0 ? String(parsed.benefitAmount) : '');
       setDealTag(parsed.dealTag);
+      if (parsed.payMethod) setPayMethod(parsed.payMethod);
       if (parsed.breakdown) setMemo(parsed.breakdown);
       setAiNotice(
         parsed.fallbackReason
@@ -175,6 +189,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       date: finalTargetDate,
       title: finalTitle,
       finalPrice: finalPaid,
+      payMethod,
       benefitType: finalType,
       benefitAmount: finalBenefit,
       dealTag: trimmedTag,
@@ -200,6 +215,13 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const parsedPaid = parseInt(finalPrice.replace(/,/g, ''), 10) || 0;
   const parsedBenefit = parseInt(benefitAmount.replace(/,/g, ''), 10) || 0;
   const netSpend = Math.max(0, parsedPaid - parsedBenefit);
+
+  // 신용 한도는 혜택으로 늘어나지 않는다. 이 건을 등록하면 한도를 넘는지 미리 보여준다.
+  const hasCreditLimit = creditLimitWon > 0;
+  const creditAfterSave = creditSpentOthersWon + (payMethod === 'credit' ? parsedPaid : 0);
+  const creditOverWon = creditAfterSave - creditLimitWon;
+  const isCreditOver = hasCreditLimit && payMethod === 'credit' && creditOverWon > 0;
+  const isCreditAlreadyFull = hasCreditLimit && creditSpentOthersWon >= creditLimitWon;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -433,6 +455,70 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             <p className="text-[11px] text-slate-400 mt-1 pl-1">
               카드 결제창 또는 매장에서 긁을 최종 결제 금액입니다.
             </p>
+
+            {/* 결제 수단. 신용만 별도 한도를 적용받는다 */}
+            <div className="grid grid-cols-2 gap-1.5 mt-2">
+              <button
+                type="button"
+                onClick={() => setPayMethod('debit')}
+                className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition active:scale-95 ${
+                  payMethod === 'debit'
+                    ? 'bg-sky-600 text-white border-sky-500 shadow-md shadow-sky-600/30'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <Landmark className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">계좌 / 체크</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPayMethod('credit')}
+                className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition active:scale-95 ${
+                  payMethod === 'credit'
+                    ? isCreditOver
+                      ? 'bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/30'
+                      : 'bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/30'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <CreditCard className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">신용</span>
+              </button>
+            </div>
+
+            {/* 한도를 넘겨도 등록은 막지 않는다. 대신 무엇을 넘기는지는 정확히 보여준다. */}
+            {payMethod === 'credit' && hasCreditLimit && (
+              <div
+                className={`mt-2 p-2.5 rounded-xl text-[11px] border leading-relaxed ${
+                  isCreditOver
+                    ? 'bg-rose-950/50 border-rose-500/50 text-rose-200'
+                    : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                }`}
+              >
+                {isCreditOver ? (
+                  <>
+                    <div className="flex items-center gap-1.5 font-bold text-rose-300">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        {isCreditAlreadyFull ? '신용 한도를 이미 다 썼습니다' : '신용 한도를 넘깁니다'}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-rose-200/90">
+                      등록하면 신용 {formatKRW(creditAfterSave)} / 한도 {formatKRW(creditLimitWon)} —{' '}
+                      <strong className="text-rose-100">{formatKRW(creditOverWon)} 초과</strong>
+                    </div>
+                    <div className="mt-0.5 text-rose-300/70">
+                      등록은 됩니다. 계좌/체크로 바꾸거나 다음 달로 미루는 걸 권합니다.
+                    </div>
+                  </>
+                ) : (
+                  <span>
+                    신용 {formatKRW(creditAfterSave)} / 한도 {formatKRW(creditLimitWon)} · 남은 신용{' '}
+                    <strong className="text-emerald-300">{formatKRW(Math.max(0, -creditOverWon))}</strong>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Benefit Type Selection (3 Modes) */}

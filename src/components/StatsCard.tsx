@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingDown, Sparkles, CheckCircle2, Wallet, CreditCard, Coins } from 'lucide-react';
+import { TrendingDown, Sparkles, CheckCircle2, Wallet, CreditCard, Coins, AlertTriangle } from 'lucide-react';
 import { formatCompactKRW, formatKRW } from '../utils/formatters';
 
 interface StatsCardProps {
@@ -10,6 +10,8 @@ interface StatsCardProps {
   completedCount: number;
   totalCount: number;
   baseBudgetWon: number; // 월급 룰에서 할당된 기본 한계 소비 예산 (원)
+  creditSpend: number; // 신용으로 결제한 합계 (원)
+  creditLimitWon: number; // 신용 한도 (원). 0이면 한도를 두지 않은 상태
 }
 
 export const StatsCard: React.FC<StatsCardProps> = ({
@@ -19,7 +21,9 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   pointRewardTotal,
   completedCount,
   totalCount,
-  baseBudgetWon
+  baseBudgetWon,
+  creditSpend,
+  creditLimitWon
 }) => {
   // 혜택(청구할인, 포인트적립)이 발생하면 한계 소비 예산이 늘어남
   const adjustedBudgetWon = baseBudgetWon + totalPostBenefits;
@@ -29,6 +33,13 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   const budgetRatio = adjustedBudgetWon > 0
     ? Math.min(100, Math.round((totalPlannedSpend / adjustedBudgetWon) * 100))
     : 0;
+
+  // 신용 한도는 혜택을 더하지 않는다. 예산이 늘어도 카드값을 더 쓸 수 있는 건 아니기 때문이다.
+  const creditRatio = creditLimitWon > 0
+    ? Math.min(100, Math.round((creditSpend / creditLimitWon) * 100))
+    : 0;
+  const isCreditOver = creditLimitWon > 0 && creditSpend > creditLimitWon;
+  const creditLeftWon = creditLimitWon - creditSpend;
 
   return (
     <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 rounded-2xl p-4 border border-slate-800 shadow-xl space-y-3">
@@ -146,6 +157,58 @@ export const StatsCard: React.FC<StatsCardProps> = ({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 신용 한도. 한계 소비 예산과 달리 혜택으로 늘어나지 않는다 */}
+      {creditLimitWon > 0 && (
+        <div
+          className={`rounded-2xl p-3.5 border text-xs space-y-2.5 ${
+            isCreditOver ? 'bg-rose-950/30 border-rose-500/40' : 'bg-slate-800/40 border-slate-800'
+          }`}
+        >
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-slate-300 text-xs flex items-center gap-1 whitespace-nowrap">
+              <CreditCard className={`w-3.5 h-3.5 ${isCreditOver ? 'text-rose-400' : 'text-amber-400'}`} />
+              신용 한도
+            </span>
+            <div className="text-right whitespace-nowrap">
+              <span className={`font-bold ${isCreditOver ? 'text-rose-400' : 'text-amber-300'}`}>
+                {isCreditOver
+                  ? `${formatCompactKRW(Math.abs(creditLeftWon))} 초과`
+                  : `${formatCompactKRW(creditLeftWon)} 남음`}
+              </span>
+              <span className="text-[11px] text-slate-400 ml-1.5 font-normal">({creditRatio}%)</span>
+            </div>
+          </div>
+
+          <div className="w-full bg-slate-700/60 rounded-full h-2.5 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                isCreditOver ? 'bg-rose-500' : creditRatio > 80 ? 'bg-amber-500' : 'bg-amber-400/80'
+              }`}
+              style={{ width: `${creditRatio}%` }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <div className="truncate">
+              <span>신용 </span>
+              <strong className="text-slate-200">{formatCompactKRW(creditSpend)}</strong>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+              <span>한도</span>
+              <strong className="text-amber-300 font-bold">{formatCompactKRW(creditLimitWon)}</strong>
+            </div>
+          </div>
+
+          {isCreditOver && (
+            <p className="flex items-start gap-1.5 text-[11px] text-rose-300 font-medium leading-relaxed pt-0.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              신용을 한도보다 {formatKRW(creditSpend - creditLimitWon)} 더 잡았습니다. 남은 소비는 계좌/체크로
+              쓰세요.
+            </p>
+          )}
         </div>
       )}
 

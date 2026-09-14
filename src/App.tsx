@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, DealItem, SalaryConfig } from './types';
-import { loadAppState, saveAppState, calculateSpendingLimitManwon } from './utils/storage';
+import {
+  loadAppState,
+  saveAppState,
+  calculateSpendingLimitManwon,
+  calculateCreditLimitManwon,
+  calculateCreditSpendWon
+} from './utils/storage';
 import { getTodayString } from './utils/formatters';
 import { Header } from './components/Header';
 import { StatsCard } from './components/StatsCard';
@@ -70,6 +76,40 @@ export const App: React.FC = () => {
     const limitManwon = calculateSpendingLimitManwon(appState.salaryConfig);
     return limitManwon * 10000;
   }, [appState.salaryConfig]);
+
+  // 신용 한도는 혜택으로 늘어나지 않는다. 한계 소비와 달리 totalPostBenefits를 더하지 않는다.
+  const creditLimitWon = useMemo(() => {
+    return calculateCreditLimitManwon(appState.salaryConfig) * 10000;
+  }, [appState.salaryConfig]);
+
+  const creditSpend = useMemo(() => {
+    return calculateCreditSpendWon(currentMonthDeals);
+  }, [currentMonthDeals]);
+
+  /**
+   * 날짜 순으로 쌓다가 한도를 넘긴 시점부터의 신용 건들.
+   * "신용이 꽉 찬 뒤에 올린 건"이 어느 것인지 목록에서 바로 보이게 한다.
+   */
+  const overCreditDealIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (creditLimitWon <= 0) return ids;
+    let running = 0;
+    const creditDeals = currentMonthDeals
+      .filter((d) => d.payMethod === 'credit')
+      .sort((a, b) => (a.date === b.date ? a.createdAt - b.createdAt : a.date.localeCompare(b.date)));
+    for (const deal of creditDeals) {
+      running += deal.finalPrice;
+      if (running > creditLimitWon) ids.add(deal.id);
+    }
+    return ids;
+  }, [currentMonthDeals, creditLimitWon]);
+
+  // 편집 중인 건은 빼야 모달 미리보기에서 같은 금액을 두 번 세지 않는다
+  const creditSpentOthersWon = useMemo(() => {
+    return calculateCreditSpendWon(
+      editDealItem ? currentMonthDeals.filter((d) => d.id !== editDealItem.id) : currentMonthDeals
+    );
+  }, [currentMonthDeals, editDealItem]);
 
   // Handlers
   const handleSaveDeal = (item: DealItem) => {
@@ -191,6 +231,8 @@ export const App: React.FC = () => {
               completedCount={completedCount}
               totalCount={currentMonthDeals.length}
               baseBudgetWon={spendingLimitWon}
+              creditSpend={creditSpend}
+              creditLimitWon={creditLimitWon}
             />
 
             {/* Calendar Grid */}
@@ -215,6 +257,7 @@ export const App: React.FC = () => {
               onToggleComplete={handleToggleComplete}
               onEditDeal={handleEditDeal}
               onOpenAddModal={(dateStr) => handleOpenAddForDate(dateStr)}
+              overCreditDealIds={overCreditDealIds}
             />
           </>
         )}
@@ -224,6 +267,7 @@ export const App: React.FC = () => {
             config={appState.salaryConfig}
             currentPlannedDealsSpend={totalPlannedSpend}
             totalPostBenefits={totalPostBenefits}
+            currentCreditSpend={creditSpend}
             onUpdateConfig={handleUpdateSalaryConfig}
           />
         )}
@@ -256,6 +300,8 @@ export const App: React.FC = () => {
         quickTags={appState.quickTags}
         currentYear={currentYear}
         currentMonth={currentMonth}
+        creditLimitWon={creditLimitWon}
+        creditSpentOthersWon={creditSpentOthersWon}
         onClose={() => {
           setIsQuickAddOpen(false);
           setEditDealItem(null);

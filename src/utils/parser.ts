@@ -1,4 +1,4 @@
-import { BenefitType } from '../types';
+import { BenefitType, PayMethod } from '../types';
 
 export interface ParsedEntry {
   date?: string;
@@ -7,6 +7,8 @@ export interface ParsedEntry {
   benefitType: BenefitType;
   benefitAmount: number;
   dealTag: string;
+  /** 문장에 결제 수단 표기가 없으면 undefined. 이때는 화면의 현재 선택을 건드리지 않는다. */
+  payMethod?: PayMethod;
 }
 
 const COMMON_TAGS = [
@@ -32,6 +34,26 @@ const BENEFIT_AFTER_AMOUNT = new RegExp(
   'i'
 );
 
+// 결제 수단 표기. 맨 '카드'는 넣지 않는다. '체크카드'도 '신한카드'도 '카드'라서
+// 이것만으로는 신용인지 알 수 없고, 태그 이름과도 부딪힌다.
+const PAY_CREDIT = String.raw`신용(?:카드)?|할부`;
+const PAY_DEBIT = String.raw`체크(?:카드)?|계좌(?:이체)?|이체|현금|직불`;
+const PAY_METHOD_PATTERN = new RegExp(
+  String.raw`(?:^|\s)(?:(${PAY_CREDIT})|(${PAY_DEBIT}))(?:로|으로)?(?=\s|$)`,
+  'g'
+);
+
+/** 결제 수단 표기를 읽고 제목에서 걷어낸다. 표기가 없으면 undefined를 돌려준다. */
+function extractPayMethod(text: string): { payMethod?: PayMethod; rest: string } {
+  let payMethod: PayMethod | undefined;
+  const rest = text.replace(PAY_METHOD_PATTERN, (_match, credit) => {
+    // 먼저 나온 표기를 따른다. 한 문장에 둘 다 적었다면 사람이 고쳐야 하는 입력이다.
+    if (!payMethod) payMethod = credit ? 'credit' : 'debit';
+    return ' ';
+  });
+  return { payMethod, rest: rest.replace(/\s+/g, ' ').trim() };
+}
+
 /**
  * 자연어 한 줄 입력 파서
  * 예시 입력:
@@ -52,7 +74,8 @@ export function parseQuickEntry(
       finalPrice: 0,
       benefitType: 'instant',
       benefitAmount: 0,
-      dealTag: ''
+      dealTag: '',
+      payMethod: undefined
     };
   }
 
@@ -75,7 +98,11 @@ export function parseQuickEntry(
     }
   }
 
-  // 2. 할인/적립 금액 명시 패턴 추출 (예: "청구할인 2000", "적립 24000", "할인 3000", "-3000")
+  // 2. 결제 수단 추출 (금액 추출보다 먼저 해야 '할부' 같은 표기가 제목에 남지 않는다)
+  const { payMethod, rest } = extractPayMethod(text);
+  text = rest;
+
+  // 3. 할인/적립 금액 명시 패턴 추출 (예: "청구할인 2000", "적립 24000", "할인 3000", "-3000")
   let benefitAmount = 0;
   const explicitBenefitMatch = text.match(BENEFIT_BEFORE_AMOUNT) || text.match(BENEFIT_AFTER_AMOUNT);
 
@@ -87,7 +114,7 @@ export function parseQuickEntry(
     text = text.replace(explicitBenefitMatch[0], ' ').trim();
   }
 
-  // 3. 태그 추출 (사용자 태그 우선, 긴 태그부터 매칭해 '삼성LINK'가 '삼성'에 가려지지 않게)
+  // 4. 태그 추출 (사용자 태그 우선, 긴 태그부터 매칭해 '삼성LINK'가 '삼성'에 가려지지 않게)
   let dealTag = '';
   const candidateTags = [...new Set([...userTags, ...COMMON_TAGS])].sort(
     (a, b) => b.length - a.length
@@ -101,7 +128,7 @@ export function parseQuickEntry(
     }
   }
 
-  // 4. 남은 숫자들 추출 (결제 금액 및 남은 혜택금액 처리)
+  // 5. 남은 숫자들 추출 (결제 금액 및 남은 혜택금액 처리)
   const amounts = extractAmounts(text);
   let finalPrice = 0;
 
@@ -116,7 +143,7 @@ export function parseQuickEntry(
     text = cutOut(text, used);
   }
 
-  // 5. 남은 텍스트는 제목
+  // 6. 남은 텍스트는 제목
   let title = text.replace(/\s+/g, ' ').trim();
   if (!title && dealTag) {
     title = dealTag;
@@ -135,7 +162,8 @@ export function parseQuickEntry(
     finalPrice,
     benefitType: benefitAmount > 0 ? benefitType : 'instant',
     benefitAmount,
-    dealTag: dealTag || ''
+    dealTag: dealTag || '',
+    payMethod
   };
 }
 

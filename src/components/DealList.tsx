@@ -1,6 +1,6 @@
 import React from 'react';
 import { DealItem } from '../types';
-import { CheckCircle2, Circle, Sparkles, Tag, Calendar, Plus, Clock, CreditCard, Coins } from 'lucide-react';
+import { CheckCircle2, Circle, Sparkles, Tag, Calendar, Plus, Clock, CreditCard, Coins, Landmark, AlertTriangle } from 'lucide-react';
 import { formatKRW } from '../utils/formatters';
 
 interface DealListProps {
@@ -11,6 +11,8 @@ interface DealListProps {
   onToggleComplete: (id: string) => void;
   onEditDeal: (deal: DealItem) => void;
   onOpenAddModal: (dateStr?: string) => void;
+  /** 신용 한도를 넘긴 시점 이후의 신용 건 id. 어떤 건이 선을 넘었는지 표시한다 */
+  overCreditDealIds: Set<string>;
 }
 
 export const DealList: React.FC<DealListProps> = ({
@@ -20,7 +22,8 @@ export const DealList: React.FC<DealListProps> = ({
   onToggleViewMode,
   onToggleComplete,
   onEditDeal,
-  onOpenAddModal
+  onOpenAddModal,
+  overCreditDealIds
 }) => {
   // Filter deals based on viewMode
   const filteredDeals = React.useMemo(() => {
@@ -145,6 +148,29 @@ export const DealList: React.FC<DealListProps> = ({
                       <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 flex items-center gap-1">
                         <Tag className="w-2.5 h-2.5" />
                         {deal.dealTag}
+                      </span>
+                    )}
+
+                    {/* 결제 수단. 신용 한도를 넘긴 건은 같은 자리에서 붉게 경고한다 */}
+                    {deal.payMethod === 'credit' ? (
+                      <span
+                        className={`text-[11px] font-medium px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${
+                          overCreditDealIds.has(deal.id)
+                            ? 'bg-rose-950/70 text-rose-300 border-rose-500/50'
+                            : 'bg-amber-950/60 text-amber-300 border-amber-700/50'
+                        }`}
+                      >
+                        {overCreditDealIds.has(deal.id) ? (
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                        ) : (
+                          <CreditCard className="w-2.5 h-2.5" />
+                        )}
+                        {overCreditDealIds.has(deal.id) ? '신용 한도 초과' : '신용'}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-sky-950/60 text-sky-300 border border-sky-800/50 flex items-center gap-1">
+                        <Landmark className="w-2.5 h-2.5" />
+                        계좌
                       </span>
                     )}
 

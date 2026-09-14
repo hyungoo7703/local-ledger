@@ -1,4 +1,4 @@
-import { AppState, SalaryConfig } from '../types';
+import { AppState, DealItem, PayMethod, SalaryConfig } from '../types';
 
 const STORAGE_KEY = 'LOCAL_LEDGER_DATA_V3';
 const BROKEN_KEY_PREFIX = 'LOCAL_LEDGER_BROKEN_';
@@ -6,7 +6,7 @@ const PREIMPORT_KEY_PREFIX = 'LOCAL_LEDGER_PREIMPORT_';
 const MAX_SNAPSHOTS = 5;
 
 const BACKUP_APP_ID = 'local-ledger';
-const BACKUP_SCHEMA_VERSION = 3;
+const BACKUP_SCHEMA_VERSION = 4;
 
 export const DEFAULT_QUICK_TAGS = [
   '삼성LINK',
@@ -43,6 +43,35 @@ export function calculateSpendingLimitManwon(config: SalaryConfig): number {
   return config.deductions
     .filter((item) => item.isSpending)
     .reduce((sum, item) => sum + (Number(item.amountManwon) || 0), 0);
+}
+
+/**
+ * 저장된 값이 무엇이든 'credit'이 아니면 계좌/체크로 본다.
+ * 결제 수단이 없던 시절의 기록은 전부 계좌로 넘어온다. 근거 없이 신용으로 찍으면
+ * 지난 달들이 한꺼번에 한도 초과로 보여서 경고가 의미를 잃는다.
+ */
+export function toPayMethod(value: unknown): PayMethod {
+  return value === 'credit' ? 'credit' : 'debit';
+}
+
+/**
+ * 신용 한도는 한계 소비 안쪽에서만 유효하다.
+ * 소비 항목을 줄이면 한도가 저절로 따라 내려와야 하므로, 저장값을 믿지 않고 읽을 때마다 자른다.
+ */
+export function calculateCreditLimitManwon(config: SalaryConfig): number {
+  const raw = Number(config?.creditLimitManwon) || 0;
+  if (raw <= 0) return 0;
+  return Math.min(Math.round(raw), calculateSpendingLimitManwon(config));
+}
+
+/**
+ * 신용으로 잡은 결제(승인) 금액의 합. 청구할인을 빼지 않는다.
+ * 빼기 시작하면 혜택이 늘수록 신용을 더 쓸 수 있게 되어 한도를 둔 이유가 사라진다.
+ */
+export function calculateCreditSpendWon(deals: DealItem[]): number {
+  return deals
+    .filter((d) => d.payMethod === 'credit')
+    .reduce((sum, d) => sum + (Number(d.finalPrice) || 0), 0);
 }
 
 function createInitialState(): AppState {
@@ -143,6 +172,7 @@ export function loadAppState(): AppState {
       date: String(d.date || ''),
       title: String(d.title || '플랜'),
       finalPrice: Number(d.finalPrice) || 0,
+      payMethod: toPayMethod(d.payMethod),
       benefitType: (d.benefitType === 'bill_discount' || d.benefitType === 'point_reward')
         ? d.benefitType
         : (d.discountAmount ? 'bill_discount' : 'instant'),
@@ -236,6 +266,7 @@ export function parseBackupJson(jsonStr: string): { state: AppState; summary: Ba
         date: String(d.date || ''),
         title: String(d.title || '플랜'),
         finalPrice: Number(d.finalPrice) || 0,
+        payMethod: toPayMethod(d.payMethod),
         benefitType: (d.benefitType === 'bill_discount' || d.benefitType === 'point_reward')
           ? d.benefitType
           : (d.discountAmount ? 'bill_discount' : 'instant'),
@@ -265,7 +296,8 @@ export function parseBackupJson(jsonStr: string): { state: AppState; summary: Ba
           title: String(c.title || ''),
           isChecked: Boolean(c.isChecked)
         }))
-      : []
+      : [],
+    creditLimitManwon: Math.max(0, Math.round(Number(parsed.salaryConfig?.creditLimitManwon) || 0))
   };
 
   // 3. QuickTags 복원 (문자열만 통과)
