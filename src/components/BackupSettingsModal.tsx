@@ -627,6 +627,16 @@ export const BackupSettingsModal: React.FC<BackupSettingsProps> = ({
           <span>가계부 데이터 완전 초기화</span>
         </button>
       </div>
+
+      {/* 빌드할 때 vite-plugins/third-party-licenses.ts가 만드는 파일 */}
+      <a
+        href={`${import.meta.env.BASE_URL}third-party-licenses.txt`}
+        target="_blank"
+        rel="noopener"
+        className="block text-center text-[11px] text-slate-500 hover:text-slate-300 underline underline-offset-2 pb-2 transition"
+      >
+        오픈소스 라이선스
+      </a>
     </div>
   );
 };
