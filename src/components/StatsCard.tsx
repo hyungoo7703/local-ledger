@@ -1,12 +1,13 @@
 import React from 'react';
-import { TrendingDown, Sparkles, CheckCircle2, Wallet, CreditCard, Coins, AlertTriangle } from 'lucide-react';
+import { TrendingDown, Sparkles, CheckCircle2, Wallet, CreditCard, Coins, Banknote, AlertTriangle } from 'lucide-react';
 import { formatCompactKRW, formatKRW } from '../utils/formatters';
 
 interface StatsCardProps {
   totalPlannedSpend: number; // 실제 결제(승인) 예정 총액 (원)
-  totalPostBenefits: number; // 혜택 총액 (청구할인 + 적립) (원)
+  totalPostBenefits: number; // 혜택 총액 (청구할인 + 포인트 적립 + 캐시백) (원)
   billDiscountTotal: number; // 결제일 청구할인 합계 (원)
-  pointRewardTotal: number; // 포인트/캐시백 적립 합계 (원)
+  pointRewardTotal: number; // 포인트 적립 합계 (원)
+  cashbackTotal: number; // 캐시백 합계 (원)
   completedCount: number;
   totalCount: number;
   baseBudgetWon: number; // 월급 룰에서 할당된 기본 한계 소비 예산 (원)
@@ -20,6 +21,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   totalPostBenefits,
   billDiscountTotal,
   pointRewardTotal,
+  cashbackTotal,
   completedCount,
   totalCount,
   baseBudgetWon,
@@ -27,7 +29,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   creditLimitWon,
   creditBillDiscount
 }) => {
-  // 혜택(청구할인, 포인트적립)이 발생하면 한계 소비 예산이 늘어남
+  // 혜택(청구할인, 포인트 적립, 캐시백)이 발생하면 한계 소비 예산이 늘어남
   const adjustedBudgetWon = baseBudgetWon + totalPostBenefits;
   const netSpend = Math.max(0, totalPlannedSpend - totalPostBenefits);
   const remainingBudgetWon = adjustedBudgetWon - totalPlannedSpend;
@@ -37,7 +39,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
     : 0;
 
   // 신용 한도는 신용 건의 청구할인만큼만 늘어난다. 카드사가 카드값에서 직접 빼주는 건 그것뿐이다.
-  // 포인트 적립과 계좌/체크 건의 혜택은 소비 예산만 늘리고 카드값은 그대로라 여기에 더하지 않는다.
+  // 포인트 적립·캐시백과 계좌/체크 건의 혜택은 소비 예산만 늘리고 카드값은 그대로라 여기에 더하지 않는다.
   const adjustedCreditLimitWon = creditLimitWon > 0 ? creditLimitWon + creditBillDiscount : 0;
   const creditRatio = adjustedCreditLimitWon > 0
     ? Math.min(100, Math.round((creditSpend / adjustedCreditLimitWon) * 100))
@@ -86,16 +88,26 @@ export const StatsCard: React.FC<StatsCardProps> = ({
             <div className="text-lg font-extrabold text-pink-400 tracking-tight">
               +{formatCompactKRW(totalPostBenefits)}
             </div>
-            <div className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
-              <span className="flex items-center gap-0.5 text-emerald-300">
-                <CreditCard className="w-3 h-3 shrink-0" />
-                {formatCompactKRW(billDiscountTotal)}
-              </span>
-              <span>·</span>
-              <span className="flex items-center gap-0.5 text-pink-300">
-                <Coins className="w-3 h-3 shrink-0" />
-                {formatCompactKRW(pointRewardTotal)}
-              </span>
+            {/* 반쪽 폭이라 세 항목을 한 줄에 다 넣으면 잘린다. 0원은 숨기고 넘치면 다음 줄로 */}
+            <div className="text-[11px] text-slate-300 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              {billDiscountTotal > 0 && (
+                <span className="flex items-center gap-0.5 text-emerald-300 whitespace-nowrap" title="청구할인">
+                  <CreditCard className="w-3 h-3 shrink-0" />
+                  {formatCompactKRW(billDiscountTotal)}
+                </span>
+              )}
+              {pointRewardTotal > 0 && (
+                <span className="flex items-center gap-0.5 text-pink-300 whitespace-nowrap" title="포인트 적립">
+                  <Coins className="w-3 h-3 shrink-0" />
+                  {formatCompactKRW(pointRewardTotal)}
+                </span>
+              )}
+              {cashbackTotal > 0 && (
+                <span className="flex items-center gap-0.5 text-violet-300 whitespace-nowrap" title="캐시백">
+                  <Banknote className="w-3 h-3 shrink-0" />
+                  {formatCompactKRW(cashbackTotal)}
+                </span>
+              )}
             </div>
           </div>
 

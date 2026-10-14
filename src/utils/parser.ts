@@ -79,9 +79,11 @@ export function parseQuickEntry(
     };
   }
 
-  // 혜택 유형 감지
+  // 혜택 유형 감지. 캐시백을 먼저 본다 ("캐시백 적립"은 캐시백이다)
   let benefitType: BenefitType = 'instant';
-  if (/적립|캐시백|포인트|페이백/i.test(text)) {
+  if (/캐시백|페이백/i.test(text)) {
+    benefitType = 'cashback';
+  } else if (/적립|포인트/i.test(text)) {
     benefitType = 'point_reward';
   } else if (/청구|결제일|LINK|링크/i.test(text)) {
     benefitType = 'bill_discount';

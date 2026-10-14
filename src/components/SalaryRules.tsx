@@ -437,7 +437,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
 
           <p className="text-[11px] text-slate-400 leading-relaxed">
             한계 소비 {spendingLimitManwon}만원 안에서만 정할 수 있습니다. 신용으로 받은 청구할인만큼만
-            늘어나고, 포인트 적립이나 계좌/체크 혜택으로는 늘지 않습니다.
+            늘어나고, 포인트 적립·캐시백이나 계좌/체크 혜택으로는 늘지 않습니다.
           </p>
 
           {isCreditClamped && (

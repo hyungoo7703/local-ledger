@@ -80,9 +80,16 @@ export const App: React.FC = () => {
       .reduce((sum, d) => sum + (d.benefitAmount || 0), 0);
   }, [currentMonthDeals]);
 
+  const cashbackTotal = useMemo(() => {
+    return currentMonthDeals
+      .filter((d) => d.benefitType === 'cashback')
+      .reduce((sum, d) => sum + (d.benefitAmount || 0), 0);
+  }, [currentMonthDeals]);
+
+  // 한계 소비 예산을 늘리는 혜택 전체. 'instant'(일반)는 결제 금액에 이미 반영돼 있어 넣지 않는다.
   const totalPostBenefits = useMemo(() => {
-    return billDiscountTotal + pointRewardTotal;
-  }, [billDiscountTotal, pointRewardTotal]);
+    return billDiscountTotal + pointRewardTotal + cashbackTotal;
+  }, [billDiscountTotal, pointRewardTotal, cashbackTotal]);
 
   const completedCount = useMemo(() => {
     return currentMonthDeals.filter((d) => d.isCompleted).length;
@@ -253,6 +260,7 @@ export const App: React.FC = () => {
               totalPostBenefits={totalPostBenefits}
               billDiscountTotal={billDiscountTotal}
               pointRewardTotal={pointRewardTotal}
+              cashbackTotal={cashbackTotal}
               completedCount={completedCount}
               totalCount={currentMonthDeals.length}
               baseBudgetWon={spendingLimitWon}

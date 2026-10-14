@@ -1,7 +1,15 @@
-export type BenefitType = 'instant' | 'bill_discount' | 'point_reward';
-// instant: 결제 전 즉시할인(쿠폰/세일) -> 최종 결제금액만 소비로 차감
-// bill_discount: 결제일(청구) 할인 -> 결제금액은 그대로지만 결제일 할인으로 한계 예산 증가/실질소비 차감
-// point_reward: 포인트/캐시백 적립 -> 결제금액은 그대로지만 포인트 적립으로 한계 예산 증가/실질소비 차감
+// 혜택 유형은 이 목록 하나로 정의한다. 저장소·백업·AI가 모두 이 목록으로 값을 검증하므로,
+// 여기 없는 값은 불러올 때 'instant'로 바뀐다. 유형을 추가하면 반드시 여기에 넣는다.
+export const BENEFIT_TYPES = ['instant', 'bill_discount', 'point_reward', 'cashback'] as const;
+export type BenefitType = (typeof BENEFIT_TYPES)[number];
+// instant(화면 표기 '일반'): 혜택 없음, 또는 쿠폰·즉시할인처럼 결제 금액에 이미 반영된 것 -> 결제 금액만 소비로 차감
+// bill_discount: 결제일(청구) 할인 -> 한계 예산 증가. 신용 결제면 카드값이 실제로 줄어 신용 한도도 증가
+// point_reward: 포인트 적립 -> 한계 예산 증가. 카드값은 그대로
+// cashback: 캐시백·페이백 -> 한계 예산 증가. 카드값은 그대로 (계산은 point_reward와 같고 표기만 다르다)
+
+export function isBenefitType(value: unknown): value is BenefitType {
+  return (BENEFIT_TYPES as readonly unknown[]).includes(value);
+}
 
 export type PayMethod = 'debit' | 'credit';
 // debit: 계좌/체크 -> 통장에서 바로 빠진다

@@ -1,6 +1,6 @@
 import React from 'react';
 import { DealItem } from '../types';
-import { CheckCircle2, Circle, Sparkles, Tag, Calendar, Plus, Clock, CreditCard, Coins, Landmark, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Circle, Sparkles, Tag, Calendar, Plus, Clock, CreditCard, Coins, Banknote, Landmark, AlertTriangle } from 'lucide-react';
 import { formatKRW } from '../utils/formatters';
 
 interface DealListProps {
@@ -217,6 +217,13 @@ export const DealList: React.FC<DealListProps> = ({
                       <div className="flex items-center gap-1 bg-pink-950/60 text-pink-300 border border-pink-500/40 px-2 py-1 rounded-lg font-semibold whitespace-nowrap">
                         <Coins className="w-3 h-3 text-pink-400 shrink-0" />
                         <span>+{formatKRW(deal.benefitAmount)} 적립</span>
+                      </div>
+                    )}
+
+                    {deal.benefitType === 'cashback' && deal.benefitAmount > 0 && (
+                      <div className="flex items-center gap-1 bg-violet-950/60 text-violet-300 border border-violet-500/40 px-2 py-1 rounded-lg font-semibold whitespace-nowrap">
+                        <Banknote className="w-3 h-3 text-violet-400 shrink-0" />
+                        <span>+{formatKRW(deal.benefitAmount)} 캐시백</span>
                       </div>
                     )}
 

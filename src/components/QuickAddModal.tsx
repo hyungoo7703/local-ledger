@@ -1,10 +1,54 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Sparkles, Calendar, Tag, Check, ArrowRight, CreditCard, Coins, ShoppingBag, Loader2, Landmark, AlertTriangle } from 'lucide-react';
+import { X, Sparkles, Calendar, Tag, Check, ArrowRight, CreditCard, Coins, Banknote, ShoppingBag, Loader2, Landmark, AlertTriangle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { DealItem, BenefitType, PayMethod } from '../types';
+import { DealItem, BenefitType, PayMethod, BENEFIT_TYPES } from '../types';
 import { generateId, getTodayString, formatKRW } from '../utils/formatters';
 import { parseQuickEntry } from '../utils/parser';
 import { loadAiConfig, hasApiKey, parseEntryWithGemini, AiError } from '../utils/ai';
+
+// 혜택 유형별 버튼·입력란 표기. Tailwind가 클래스를 찾을 수 있도록 이름을 조립하지 않고 통째로 적는다.
+const BENEFIT_OPTIONS: Record<
+  BenefitType,
+  { label: string; icon: LucideIcon; active: string; accent: string; amountLabel: string; input: string; banner: string }
+> = {
+  instant: {
+    label: '일반',
+    icon: ShoppingBag,
+    active: 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30',
+    accent: 'text-indigo-400',
+    amountLabel: '',
+    input: '',
+    banner: ''
+  },
+  bill_discount: {
+    label: '청구할인',
+    icon: CreditCard,
+    active: 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30',
+    accent: 'text-emerald-400',
+    amountLabel: '결제일 청구할인액 (원 단위)',
+    input: 'border-emerald-500/50 text-emerald-300 focus:border-emerald-400',
+    banner: 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
+  },
+  point_reward: {
+    label: '포인트적립',
+    icon: Coins,
+    active: 'bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/30',
+    accent: 'text-pink-400',
+    amountLabel: '적립 금액 (원 단위)',
+    input: 'border-pink-500/50 text-pink-300 focus:border-pink-400',
+    banner: 'bg-pink-950/40 border-pink-500/30 text-pink-200'
+  },
+  cashback: {
+    label: '캐시백',
+    icon: Banknote,
+    active: 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-600/30',
+    accent: 'text-violet-400',
+    amountLabel: '캐시백 금액 (원 단위)',
+    input: 'border-violet-500/50 text-violet-300 focus:border-violet-400',
+    banner: 'bg-violet-950/40 border-violet-500/30 text-violet-200'
+  }
+};
 
 interface QuickAddModalProps {
   isOpen: boolean;
@@ -525,71 +569,48 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             )}
           </div>
 
-          {/* Benefit Type Selection (3 Modes) */}
+          {/* 혜택 유형 4가지 */}
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">
               할인 및 혜택 유형
             </label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {/* Instant discount */}
-              <button
-                type="button"
-                onClick={() => setBenefitType('instant')}
-                className={`p-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
-                  benefitType === 'instant'
-                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
-                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
-                }`}
-              >
-                <ShoppingBag className="w-4 h-4 shrink-0" />
-                <span className="text-center text-xs whitespace-nowrap">즉시할인</span>
-              </button>
-
-              {/* Bill discount (삼성LINK, 청구할인 등) */}
-              <button
-                type="button"
-                onClick={() => setBenefitType('bill_discount')}
-                className={`p-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
-                  benefitType === 'bill_discount'
-                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30'
-                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
-                }`}
-              >
-                <CreditCard className="w-4 h-4 shrink-0" />
-                <span className="text-center text-xs whitespace-nowrap">청구할인</span>
-              </button>
-
-              {/* Point reward (Tday 적립, 캐시백 등) */}
-              <button
-                type="button"
-                onClick={() => setBenefitType('point_reward')}
-                className={`p-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
-                  benefitType === 'point_reward'
-                    ? 'bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/30'
-                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
-                }`}
-              >
-                <Coins className="w-4 h-4 shrink-0" />
-                <span className="text-center text-xs whitespace-nowrap">포인트적립</span>
-              </button>
+            <div className="grid grid-cols-4 gap-1.5">
+              {BENEFIT_TYPES.map((type) => {
+                const option = BENEFIT_OPTIONS[type];
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setBenefitType(type)}
+                    className={`py-2 px-1 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 border transition active:scale-95 ${
+                      benefitType === type
+                        ? option.active
+                        : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="text-center text-xs whitespace-nowrap">{option.label}</span>
+                  </button>
+                );
+              })}
             </div>
+            {benefitType === 'instant' && (
+              <p className="text-[11px] text-slate-400 mt-1.5 pl-1">
+                혜택이 없거나, 쿠폰·즉시할인처럼 결제 금액에 이미 반영된 경우입니다.
+              </p>
+            )}
           </div>
 
-          {/* Conditional Benefit Amount Input (for bill_discount or point_reward) */}
+          {/* 혜택 금액 입력 (일반이 아닐 때) */}
           {benefitType !== 'instant' && (
             <div className="space-y-2 bg-slate-800/50 p-3 rounded-2xl border border-slate-700/80">
               <label className="block text-xs font-semibold text-white flex items-center gap-1 whitespace-nowrap">
-                {benefitType === 'bill_discount' ? (
-                  <>
-                    <CreditCard className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>결제일 청구할인액 (원 단위)</span>
-                  </>
-                ) : (
-                  <>
-                    <Coins className="w-3.5 h-3.5 text-pink-400 shrink-0" />
-                    <span>적립 금액 (원 단위)</span>
-                  </>
-                )}
+                {(() => {
+                  const Icon = BENEFIT_OPTIONS[benefitType].icon;
+                  return <Icon className={`w-3.5 h-3.5 shrink-0 ${BENEFIT_OPTIONS[benefitType].accent}`} />;
+                })()}
+                <span>{BENEFIT_OPTIONS[benefitType].amountLabel}</span>
               </label>
 
               <div className="relative">
@@ -602,11 +623,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                     const raw = e.target.value.replace(/\D/g, '');
                     setBenefitAmount(raw);
                   }}
-                  className={`w-full bg-slate-900 border rounded-xl px-3.5 py-2.5 text-sm font-bold placeholder-slate-500 focus:outline-none ${
-                    benefitType === 'bill_discount'
-                      ? 'border-emerald-500/50 text-emerald-300 focus:border-emerald-400'
-                      : 'border-pink-500/50 text-pink-300 focus:border-pink-400'
-                  }`}
+                  className={`w-full bg-slate-900 border rounded-xl px-3.5 py-2.5 text-sm font-bold placeholder-slate-500 focus:outline-none ${BENEFIT_OPTIONS[benefitType].input}`}
                 />
                 <span className="absolute right-3.5 top-3 text-xs text-slate-400">원</span>
               </div>
@@ -614,11 +631,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
               {/* Dynamic Feedback Banner */}
               {parsedBenefit > 0 && (
                 <div
-                  className={`p-2.5 rounded-xl text-xs flex flex-col gap-1 border ${
-                    benefitType === 'bill_discount'
-                      ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
-                      : 'bg-pink-950/40 border-pink-500/30 text-pink-200'
-                  }`}
+                  className={`p-2.5 rounded-xl text-xs flex flex-col gap-1 border ${BENEFIT_OPTIONS[benefitType].banner}`}
                 >
                   <div className="flex items-center justify-between font-bold whitespace-nowrap">
                     <span>✨ 예산 확대 효과:</span>

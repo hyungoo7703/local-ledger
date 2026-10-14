@@ -1,4 +1,4 @@
-import { AppState, DealItem, PayMethod, SalaryConfig } from '../types';
+import { AppState, BenefitType, DealItem, PayMethod, SalaryConfig, isBenefitType } from '../types';
 
 const STORAGE_KEY = 'LOCAL_LEDGER_DATA_V3';
 const BROKEN_KEY_PREFIX = 'LOCAL_LEDGER_BROKEN_';
@@ -6,7 +6,7 @@ const PREIMPORT_KEY_PREFIX = 'LOCAL_LEDGER_PREIMPORT_';
 const MAX_SNAPSHOTS = 5;
 
 const BACKUP_APP_ID = 'local-ledger';
-const BACKUP_SCHEMA_VERSION = 4;
+const BACKUP_SCHEMA_VERSION = 5;
 
 export const DEFAULT_QUICK_TAGS = [
   '삼성LINK',
@@ -52,6 +52,16 @@ export function calculateSpendingLimitManwon(config: SalaryConfig): number {
  */
 export function toPayMethod(value: unknown): PayMethod {
   return value === 'credit' ? 'credit' : 'debit';
+}
+
+/**
+ * 저장된 혜택 유형을 읽는다 (저장소와 백업이 같이 쓴다).
+ * 'instant'이거나 모르는 값이면 예전과 똑같이 옛 형식의 discountAmount를 보고 정한다.
+ * 목록 검사를 빼먹으면 새 유형(cashback)이 불러올 때마다 'instant'로 바뀌어 혜택이 예산에서 사라진다.
+ */
+export function toBenefitType(deal: any): BenefitType {
+  if (isBenefitType(deal?.benefitType) && deal.benefitType !== 'instant') return deal.benefitType;
+  return deal?.discountAmount ? 'bill_discount' : 'instant';
 }
 
 /**
@@ -188,9 +198,7 @@ export function loadAppState(): AppState {
       title: String(d.title || '플랜'),
       finalPrice: Number(d.finalPrice) || 0,
       payMethod: toPayMethod(d.payMethod),
-      benefitType: (d.benefitType === 'bill_discount' || d.benefitType === 'point_reward')
-        ? d.benefitType
-        : (d.discountAmount ? 'bill_discount' : 'instant'),
+      benefitType: toBenefitType(d),
       benefitAmount: Number(d.benefitAmount ?? d.discountAmount ?? 0),
       dealTag: String(d.dealTag || '기타'),
       memo: d.memo ? String(d.memo) : '',
@@ -282,9 +290,7 @@ export function parseBackupJson(jsonStr: string): { state: AppState; summary: Ba
         title: String(d.title || '플랜'),
         finalPrice: Number(d.finalPrice) || 0,
         payMethod: toPayMethod(d.payMethod),
-        benefitType: (d.benefitType === 'bill_discount' || d.benefitType === 'point_reward')
-          ? d.benefitType
-          : (d.discountAmount ? 'bill_discount' : 'instant'),
+        benefitType: toBenefitType(d),
         benefitAmount: Number(d.benefitAmount ?? d.discountAmount ?? 0),
         dealTag: String(d.dealTag || '기타'),
         memo: d.memo ? String(d.memo) : '',

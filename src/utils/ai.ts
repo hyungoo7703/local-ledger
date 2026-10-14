@@ -1,4 +1,4 @@
-import { PayMethod } from '../types';
+import { BenefitType, PayMethod, BENEFIT_TYPES, isBenefitType } from '../types';
 const AI_CONFIG_KEY = 'LOCAL_LEDGER_AI_CONFIG';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -168,7 +168,7 @@ export interface AiParseResult {
   date: string; // YYYY-MM-DD, 해석 실패 시 빈 문자열
   title: string;
   finalPrice: number;
-  benefitType: 'instant' | 'bill_discount' | 'point_reward';
+  benefitType: BenefitType;
   benefitAmount: number;
   dealTag: string;
   /** 문장에 결제 수단 표기가 없으면 null. 이때는 화면의 현재 선택을 건드리지 않는다. */
@@ -192,9 +192,9 @@ const ENTRY_SCHEMA = {
     totalPrice: { type: 'number', description: '총액이 문장에 직접 적혀 있으면 그 값, 아니면 0' },
     benefitType: {
       type: 'string',
-      enum: ['instant', 'bill_discount', 'point_reward'],
+      enum: [...BENEFIT_TYPES],
       description:
-        'instant=결제 시 즉시할인/쿠폰, bill_discount=카드 청구할인·결제일 할인, point_reward=포인트/캐시백 적립'
+        'instant=혜택 없음 또는 결제 시 이미 깎인 즉시할인/쿠폰, bill_discount=카드 청구할인·결제일 할인, point_reward=포인트 적립, cashback=캐시백·페이백'
     },
     benefitPercent: { type: 'number', description: '비율로 표현된 혜택(%). 없으면 0' },
     benefitAmount: { type: 'number', description: '금액으로 표현된 혜택(원). 없으면 0' },
@@ -239,7 +239,8 @@ function buildPrompt(input: string, today: string, quickTags: string[]): string 
     '혜택 유형 판단:',
     '- 쿠폰, 즉시할인, 세일가처럼 결제 시점에 이미 깎인 것 -> instant',
     '- 청구할인, 결제일 할인, 카드사 나중에 빼주는 것 -> bill_discount',
-    '- 적립, 캐시백, 포인트, 페이백 -> point_reward',
+    '- 캐시백, 페이백 -> cashback ("캐시백 적립"도 cashback)',
+    '- 포인트 적립, 적립 -> point_reward',
     '',
     quickTags.length > 0
       ? `태그는 가능하면 다음 중에서 고른다: ${quickTags.join(', ')}. 해당 없으면 문장에 나온 표현을 그대로 쓰고, 그것도 없으면 빈 문자열.`
@@ -358,10 +359,7 @@ function toEntry(raw: any, input: string): Omit<AiParseResult, 'modelUsed'> {
   const totalPrice = num(raw?.totalPrice);
   const finalPrice = Math.round(totalPrice > 0 ? totalPrice : unitPrice * quantity);
 
-  const benefitType: AiParseResult['benefitType'] =
-    raw?.benefitType === 'bill_discount' || raw?.benefitType === 'point_reward'
-      ? raw.benefitType
-      : 'instant';
+  const benefitType: BenefitType = isBenefitType(raw?.benefitType) ? raw.benefitType : 'instant';
 
   const percent = Math.min(100, num(raw?.benefitPercent));
   const flat = num(raw?.benefitAmount);
@@ -377,7 +375,7 @@ function toEntry(raw: any, input: string): Omit<AiParseResult, 'modelUsed'> {
     parts.push(`결제 ${won(finalPrice)}원`);
   }
   if (benefitAmount > 0) {
-    const label = benefitType === 'point_reward' ? '적립' : '청구할인';
+    const label = { instant: '', bill_discount: '청구할인', point_reward: '적립', cashback: '캐시백' }[benefitType];
     parts.push(percent > 0 ? `${percent}% ${label} = ${won(benefitAmount)}원` : `${label} ${won(benefitAmount)}원`);
   }
 
