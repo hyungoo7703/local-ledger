@@ -13,10 +13,12 @@ interface QuickAddModalProps {
   quickTags: string[];
   currentYear: number;
   currentMonth: number;
-  /** 신용 한도 (원). 0이면 한도를 두지 않은 상태 */
+  /** 기본 신용 한도 (원). 0이면 한도를 두지 않은 상태 */
   creditLimitWon: number;
   /** 이번 달 신용 사용액 중 지금 편집 중인 건을 뺀 금액 (원) */
   creditSpentOthersWon: number;
+  /** 이번 달 신용 청구할인 중 지금 편집 중인 건을 뺀 금액 (원). 신용 한도에 더한다 */
+  creditBillDiscountOthersWon: number;
   onClose: () => void;
   onSave: (item: DealItem) => void;
   onDelete?: (id: string) => void;
@@ -33,6 +35,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   currentMonth,
   creditLimitWon,
   creditSpentOthersWon,
+  creditBillDiscountOthersWon,
   onClose,
   onSave,
   onDelete,
@@ -216,12 +219,17 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const parsedBenefit = parseInt(benefitAmount.replace(/,/g, ''), 10) || 0;
   const netSpend = Math.max(0, parsedPaid - parsedBenefit);
 
-  // 신용 한도는 혜택으로 늘어나지 않는다. 이 건을 등록하면 한도를 넘는지 미리 보여준다.
+  // 이 건을 등록하면 신용 한도를 넘는지 미리 보여준다. 한도는 신용 청구할인만큼만 늘어나며,
+  // 지금 입력 중인 건이 신용 + 청구할인이면 그 할인도 바로 반영한다 (storage의 creditBillDiscountOf와 같은 규칙).
   const hasCreditLimit = creditLimitWon > 0;
+  const thisCreditBillDiscount =
+    payMethod === 'credit' && benefitType === 'bill_discount' ? Math.min(parsedBenefit, parsedPaid) : 0;
+  const creditLimitAfterSave = creditLimitWon + creditBillDiscountOthersWon + thisCreditBillDiscount;
   const creditAfterSave = creditSpentOthersWon + (payMethod === 'credit' ? parsedPaid : 0);
-  const creditOverWon = creditAfterSave - creditLimitWon;
+  const creditOverWon = creditAfterSave - creditLimitAfterSave;
   const isCreditOver = hasCreditLimit && payMethod === 'credit' && creditOverWon > 0;
-  const isCreditAlreadyFull = hasCreditLimit && creditSpentOthersWon >= creditLimitWon;
+  const isCreditAlreadyFull =
+    hasCreditLimit && creditSpentOthersWon >= creditLimitWon + creditBillDiscountOthersWon;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -504,7 +512,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                       </span>
                     </div>
                     <div className="mt-1 text-rose-200/90">
-                      등록하면 신용 {formatKRW(creditAfterSave)} / 한도 {formatKRW(creditLimitWon)} —{' '}
+                      등록하면 신용 {formatKRW(creditAfterSave)} / 한도 {formatKRW(creditLimitAfterSave)} —{' '}
                       <strong className="text-rose-100">{formatKRW(creditOverWon)} 초과</strong>
                     </div>
                     <div className="mt-0.5 text-rose-300/70">
@@ -513,9 +521,14 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                   </>
                 ) : (
                   <span>
-                    신용 {formatKRW(creditAfterSave)} / 한도 {formatKRW(creditLimitWon)} · 남은 신용{' '}
+                    신용 {formatKRW(creditAfterSave)} / 한도 {formatKRW(creditLimitAfterSave)} · 남은 신용{' '}
                     <strong className="text-emerald-300">{formatKRW(Math.max(0, -creditOverWon))}</strong>
                   </span>
+                )}
+                {thisCreditBillDiscount > 0 && (
+                  <div className="mt-1 text-emerald-400/90">
+                    이 건의 청구할인 +{formatKRW(thisCreditBillDiscount)}만큼 신용 한도가 늘어납니다
+                  </div>
                 )}
               </div>
             )}

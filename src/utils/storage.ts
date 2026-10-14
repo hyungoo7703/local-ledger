@@ -65,13 +65,28 @@ export function calculateCreditLimitManwon(config: SalaryConfig): number {
 }
 
 /**
- * 신용으로 잡은 결제(승인) 금액의 합. 청구할인을 빼지 않는다.
- * 빼기 시작하면 혜택이 늘수록 신용을 더 쓸 수 있게 되어 한도를 둔 이유가 사라진다.
+ * 신용으로 잡은 결제(승인) 금액의 합. 청구할인은 여기서 빼지 않고 한도 쪽에 더한다
+ * (한계 소비 예산이 '소비는 그대로, 예산은 혜택만큼 늘림'으로 보여주는 것과 같은 방식).
  */
 export function calculateCreditSpendWon(deals: DealItem[]): number {
   return deals
     .filter((d) => d.payMethod === 'credit')
     .reduce((sum, d) => sum + (Number(d.finalPrice) || 0), 0);
+}
+
+/**
+ * 이 건이 다음 달 카드값을 실제로 줄이는 금액.
+ * 신용 + 청구할인일 때만 카드사가 카드값에서 직접 빼준다. 포인트 적립은 카드값을 줄이지 않고,
+ * 계좌/체크 건의 혜택은 카드와 무관하다. 결제 금액보다 큰 할인은 있을 수 없으므로 결제 금액에서 자른다.
+ */
+export function creditBillDiscountOf(deal: DealItem): number {
+  if (deal.payMethod !== 'credit' || deal.benefitType !== 'bill_discount') return 0;
+  return Math.min(Number(deal.benefitAmount) || 0, Number(deal.finalPrice) || 0);
+}
+
+/** 신용 한도를 늘려주는 청구할인의 합 */
+export function calculateCreditBillDiscountWon(deals: DealItem[]): number {
+  return deals.reduce((sum, d) => sum + creditBillDiscountOf(d), 0);
 }
 
 function createInitialState(): AppState {

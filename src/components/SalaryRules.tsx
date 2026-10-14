@@ -9,6 +9,7 @@ interface SalaryRulesProps {
   currentPlannedDealsSpend: number; // in KRW (원)
   totalPostBenefits?: number; // in KRW (원) 혜택 총액 (청구할인 + 적립)
   currentCreditSpend?: number; // in KRW (원) 이번 달 신용 결제 합계
+  currentCreditBillDiscount?: number; // in KRW (원) 신용 건의 청구할인 합계. 신용 한도에 더한다
   onUpdateConfig: (newConfig: SalaryConfig) => void;
 }
 
@@ -20,6 +21,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   currentPlannedDealsSpend,
   totalPostBenefits = 0,
   currentCreditSpend = 0,
+  currentCreditBillDiscount = 0,
   onUpdateConfig
 }) => {
   const [baseSalaryInput, setBaseSalaryInput] = useState<string>(
@@ -66,7 +68,9 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   const creditLimitManwon = calculateCreditLimitManwon(currentConfig);
   const creditLimitWon = creditLimitManwon * 10000;
   const isCreditClamped = rawCreditLimitManwon > spendingLimitManwon;
-  const isCreditOver = creditLimitWon > 0 && currentCreditSpend > creditLimitWon;
+  // 신용 청구할인은 카드값을 직접 줄이므로 그만큼만 한도에 더한다
+  const adjustedCreditLimitWon = creditLimitWon > 0 ? creditLimitWon + currentCreditBillDiscount : 0;
+  const isCreditOver = adjustedCreditLimitWon > 0 && currentCreditSpend > adjustedCreditLimitWon;
 
   // Carry the whole form state on every update. Otherwise the sync effect above
   // reverts an in-progress salary edit as soon as any other field changes.
@@ -405,7 +409,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
         </div>
       )}
 
-      {/* 신용 한도. 한계 소비 안쪽에서만 정할 수 있고 혜택으로 늘어나지 않는다 */}
+      {/* 신용 한도. 한계 소비 안쪽에서만 정할 수 있고, 혜택 중 신용 청구할인만큼만 늘어난다 */}
       {spendingLimitWon > 0 && (
         <div
           className={`rounded-xl p-3 border text-xs space-y-2 ${
@@ -432,8 +436,8 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
           </div>
 
           <p className="text-[11px] text-slate-400 leading-relaxed">
-            한계 소비 {spendingLimitManwon}만원 안에서만 정할 수 있습니다. 혜택으로 소비 예산이 늘어도
-            신용 한도는 그대로입니다.
+            한계 소비 {spendingLimitManwon}만원 안에서만 정할 수 있습니다. 신용으로 받은 청구할인만큼만
+            늘어나고, 포인트 적립이나 계좌/체크 혜택으로는 늘지 않습니다.
           </p>
 
           {isCreditClamped && (
@@ -451,10 +455,16 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
                     {formatCompactKRW(currentCreditSpend)}
                   </span>
                   <span className="text-slate-400 text-[11px] ml-1">
-                    / {formatCompactKRW(creditLimitWon)}
+                    / {formatCompactKRW(adjustedCreditLimitWon)}
                   </span>
                 </div>
               </div>
+
+              {currentCreditBillDiscount > 0 && (
+                <div className="text-[11px] text-emerald-400 font-medium">
+                  ✨ 신용 청구할인 +{formatCompactKRW(currentCreditBillDiscount)} 반영으로 신용 한도 확대됨
+                </div>
+              )}
 
               <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
                 <div
@@ -462,7 +472,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
                     isCreditOver ? 'bg-rose-500' : 'bg-amber-500'
                   }`}
                   style={{
-                    width: `${Math.min(100, Math.round((currentCreditSpend / creditLimitWon) * 100))}%`
+                    width: `${Math.min(100, Math.round((currentCreditSpend / adjustedCreditLimitWon) * 100))}%`
                   }}
                 />
               </div>
@@ -470,7 +480,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
               {isCreditOver && (
                 <p className="flex items-start gap-1.5 text-[11px] text-rose-300 font-medium leading-relaxed">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  신용 {formatCompactKRW(currentCreditSpend - creditLimitWon)} 초과. 남은 소비는 계좌/체크로
+                  신용 {formatCompactKRW(currentCreditSpend - adjustedCreditLimitWon)} 초과. 남은 소비는 계좌/체크로
                   쓰세요.
                 </p>
               )}

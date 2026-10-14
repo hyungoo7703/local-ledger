@@ -11,7 +11,8 @@ interface StatsCardProps {
   totalCount: number;
   baseBudgetWon: number; // 월급 룰에서 할당된 기본 한계 소비 예산 (원)
   creditSpend: number; // 신용으로 결제한 합계 (원)
-  creditLimitWon: number; // 신용 한도 (원). 0이면 한도를 두지 않은 상태
+  creditLimitWon: number; // 기본 신용 한도 (원). 0이면 한도를 두지 않은 상태
+  creditBillDiscount: number; // 신용 건의 청구할인 합계 (원). 다음 달 카드값을 실제로 줄이므로 한도에 더한다
 }
 
 export const StatsCard: React.FC<StatsCardProps> = ({
@@ -23,7 +24,8 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   totalCount,
   baseBudgetWon,
   creditSpend,
-  creditLimitWon
+  creditLimitWon,
+  creditBillDiscount
 }) => {
   // 혜택(청구할인, 포인트적립)이 발생하면 한계 소비 예산이 늘어남
   const adjustedBudgetWon = baseBudgetWon + totalPostBenefits;
@@ -34,12 +36,14 @@ export const StatsCard: React.FC<StatsCardProps> = ({
     ? Math.min(100, Math.round((totalPlannedSpend / adjustedBudgetWon) * 100))
     : 0;
 
-  // 신용 한도는 혜택을 더하지 않는다. 예산이 늘어도 카드값을 더 쓸 수 있는 건 아니기 때문이다.
-  const creditRatio = creditLimitWon > 0
-    ? Math.min(100, Math.round((creditSpend / creditLimitWon) * 100))
+  // 신용 한도는 신용 건의 청구할인만큼만 늘어난다. 카드사가 카드값에서 직접 빼주는 건 그것뿐이다.
+  // 포인트 적립과 계좌/체크 건의 혜택은 소비 예산만 늘리고 카드값은 그대로라 여기에 더하지 않는다.
+  const adjustedCreditLimitWon = creditLimitWon > 0 ? creditLimitWon + creditBillDiscount : 0;
+  const creditRatio = adjustedCreditLimitWon > 0
+    ? Math.min(100, Math.round((creditSpend / adjustedCreditLimitWon) * 100))
     : 0;
-  const isCreditOver = creditLimitWon > 0 && creditSpend > creditLimitWon;
-  const creditLeftWon = creditLimitWon - creditSpend;
+  const isCreditOver = adjustedCreditLimitWon > 0 && creditSpend > adjustedCreditLimitWon;
+  const creditLeftWon = adjustedCreditLimitWon - creditSpend;
 
   return (
     <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 rounded-2xl p-4 border border-slate-800 shadow-xl space-y-3">
@@ -160,7 +164,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
         </div>
       )}
 
-      {/* 신용 한도. 한계 소비 예산과 달리 혜택으로 늘어나지 않는다 */}
+      {/* 신용 한도. 혜택 중 신용 청구할인만큼만 늘어난다 */}
       {creditLimitWon > 0 && (
         <div
           className={`rounded-2xl p-3.5 border text-xs space-y-2.5 ${
@@ -198,14 +202,19 @@ export const StatsCard: React.FC<StatsCardProps> = ({
             </div>
             <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
               <span>한도</span>
-              <strong className="text-amber-300 font-bold">{formatCompactKRW(creditLimitWon)}</strong>
+              <strong className="text-amber-300 font-bold">{formatCompactKRW(adjustedCreditLimitWon)}</strong>
+              {creditBillDiscount > 0 && (
+                <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                  +{formatKRW(creditBillDiscount)} 청구할인
+                </span>
+              )}
             </div>
           </div>
 
           {isCreditOver && (
             <p className="flex items-start gap-1.5 text-[11px] text-rose-300 font-medium leading-relaxed pt-0.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-              신용을 한도보다 {formatKRW(creditSpend - creditLimitWon)} 더 잡았습니다. 남은 소비는 계좌/체크로
+              신용을 한도보다 {formatKRW(creditSpend - adjustedCreditLimitWon)} 더 잡았습니다. 남은 소비는 계좌/체크로
               쓰세요.
             </p>
           )}

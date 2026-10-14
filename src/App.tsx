@@ -5,7 +5,9 @@ import {
   saveAppState,
   calculateSpendingLimitManwon,
   calculateCreditLimitManwon,
-  calculateCreditSpendWon
+  calculateCreditSpendWon,
+  calculateCreditBillDiscountWon,
+  creditBillDiscountOf
 } from './utils/storage';
 import { getTodayString } from './utils/formatters';
 import { requestPersistentStorage, PersistState } from './utils/persistence';
@@ -91,7 +93,7 @@ export const App: React.FC = () => {
     return limitManwon * 10000;
   }, [appState.salaryConfig]);
 
-  // 신용 한도는 혜택으로 늘어나지 않는다. 한계 소비와 달리 totalPostBenefits를 더하지 않는다.
+  // 기본 신용 한도. 화면에서는 여기에 신용 건의 청구할인만 더한다 (포인트 적립·계좌 혜택은 제외).
   const creditLimitWon = useMemo(() => {
     return calculateCreditLimitManwon(appState.salaryConfig) * 10000;
   }, [appState.salaryConfig]);
@@ -100,9 +102,14 @@ export const App: React.FC = () => {
     return calculateCreditSpendWon(currentMonthDeals);
   }, [currentMonthDeals]);
 
+  const creditBillDiscount = useMemo(() => {
+    return calculateCreditBillDiscountWon(currentMonthDeals);
+  }, [currentMonthDeals]);
+
   /**
    * 날짜 순으로 쌓다가 한도를 넘긴 시점부터의 신용 건들.
    * "신용이 꽉 찬 뒤에 올린 건"이 어느 것인지 목록에서 바로 보이게 한다.
+   * 각 건은 청구할인을 뺀 실제 카드값으로 쌓는다. 월말 합계 기준으로는 한도에 청구할인을 더한 것과 같다.
    */
   const overCreditDealIds = useMemo(() => {
     const ids = new Set<string>();
@@ -112,17 +119,21 @@ export const App: React.FC = () => {
       .filter((d) => d.payMethod === 'credit')
       .sort((a, b) => (a.date === b.date ? a.createdAt - b.createdAt : a.date.localeCompare(b.date)));
     for (const deal of creditDeals) {
-      running += deal.finalPrice;
+      running += deal.finalPrice - creditBillDiscountOf(deal);
       if (running > creditLimitWon) ids.add(deal.id);
     }
     return ids;
   }, [currentMonthDeals, creditLimitWon]);
 
   // 편집 중인 건은 빼야 모달 미리보기에서 같은 금액을 두 번 세지 않는다
-  const creditSpentOthersWon = useMemo(() => {
-    return calculateCreditSpendWon(
-      editDealItem ? currentMonthDeals.filter((d) => d.id !== editDealItem.id) : currentMonthDeals
-    );
+  const creditOthers = useMemo(() => {
+    const others = editDealItem
+      ? currentMonthDeals.filter((d) => d.id !== editDealItem.id)
+      : currentMonthDeals;
+    return {
+      spentWon: calculateCreditSpendWon(others),
+      billDiscountWon: calculateCreditBillDiscountWon(others)
+    };
   }, [currentMonthDeals, editDealItem]);
 
   // Handlers
@@ -247,6 +258,7 @@ export const App: React.FC = () => {
               baseBudgetWon={spendingLimitWon}
               creditSpend={creditSpend}
               creditLimitWon={creditLimitWon}
+              creditBillDiscount={creditBillDiscount}
             />
 
             {/* Calendar Grid */}
@@ -282,6 +294,7 @@ export const App: React.FC = () => {
             currentPlannedDealsSpend={totalPlannedSpend}
             totalPostBenefits={totalPostBenefits}
             currentCreditSpend={creditSpend}
+            currentCreditBillDiscount={creditBillDiscount}
             onUpdateConfig={handleUpdateSalaryConfig}
           />
         )}
@@ -316,7 +329,8 @@ export const App: React.FC = () => {
         currentYear={currentYear}
         currentMonth={currentMonth}
         creditLimitWon={creditLimitWon}
-        creditSpentOthersWon={creditSpentOthersWon}
+        creditSpentOthersWon={creditOthers.spentWon}
+        creditBillDiscountOthersWon={creditOthers.billDiscountWon}
         onClose={() => {
           setIsQuickAddOpen(false);
           setEditDealItem(null);
