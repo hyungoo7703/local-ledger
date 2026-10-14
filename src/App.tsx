@@ -18,6 +18,7 @@ import { DealList } from './components/DealList';
 import { SalaryRules } from './components/SalaryRules';
 import { BackupSettingsModal } from './components/BackupSettingsModal';
 import { QuickAddModal } from './components/QuickAddModal';
+import { QuickTagSettings } from './components/QuickTagSettings';
 import { Plus, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -167,12 +168,11 @@ export const App: React.FC = () => {
   };
 
   const handleAddTag = (newTag: string) => {
-    if (!appState.quickTags.includes(newTag)) {
-      setAppState((prev) => ({
-        ...prev,
-        quickTags: [...prev.quickTags, newTag]
-      }));
-    }
+    setAppState((prev) =>
+      prev.quickTags.some((t) => t.toLowerCase() === newTag.toLowerCase())
+        ? prev
+        : { ...prev, quickTags: [...prev.quickTags, newTag] }
+    );
   };
 
   const handleDeleteTag = (tagToDelete: string) => {
@@ -300,11 +300,18 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'settings' && (
-          <BackupSettingsModal
-            appState={appState}
-            onStateChange={setAppState}
-            persistState={persistState}
-          />
+          <>
+            <QuickTagSettings
+              quickTags={appState.quickTags}
+              onAddTag={handleAddTag}
+              onDeleteTag={handleDeleteTag}
+            />
+            <BackupSettingsModal
+              appState={appState}
+              onStateChange={setAppState}
+              persistState={persistState}
+            />
+          </>
         )}
       </main>
 
@@ -337,8 +344,6 @@ export const App: React.FC = () => {
         }}
         onSave={handleSaveDeal}
         onDelete={handleDeleteDeal}
-        onAddTag={handleAddTag}
-        onDeleteTag={handleDeleteTag}
       />
     </div>
   );

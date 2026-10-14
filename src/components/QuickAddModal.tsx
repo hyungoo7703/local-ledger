@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Sparkles, Plus, Calendar, Tag, Check, ArrowRight, CreditCard, Coins, ShoppingBag, Loader2, Landmark, AlertTriangle } from 'lucide-react';
+import { X, Sparkles, Calendar, Tag, Check, ArrowRight, CreditCard, Coins, ShoppingBag, Loader2, Landmark, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DealItem, BenefitType, PayMethod } from '../types';
 import { generateId, getTodayString, formatKRW } from '../utils/formatters';
@@ -22,8 +22,6 @@ interface QuickAddModalProps {
   onClose: () => void;
   onSave: (item: DealItem) => void;
   onDelete?: (id: string) => void;
-  onAddTag: (tag: string) => void;
-  onDeleteTag?: (tag: string) => void;
 }
 
 export const QuickAddModal: React.FC<QuickAddModalProps> = ({
@@ -38,9 +36,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   creditBillDiscountOthersWon,
   onClose,
   onSave,
-  onDelete,
-  onAddTag,
-  onDeleteTag
+  onDelete
 }) => {
   const [quickText, setQuickText] = useState('');
   const [date, setDate] = useState('');
@@ -51,7 +47,6 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [benefitAmount, setBenefitAmount] = useState<string>('');
   const [dealTag, setDealTag] = useState('');
   const [memo, setMemo] = useState('');
-  const [isTagManageMode, setIsTagManageMode] = useState(false);
   const [isAiRunning, setIsAiRunning] = useState(false);
   const [aiNotice, setAiNotice] = useState<{ kind: 'ok' | 'warn' | 'error'; text: string } | null>(null);
   const [inputMode, setInputMode] = useState<'basic' | 'ai'>('basic');
@@ -89,12 +84,11 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
           quickInputRef.current?.focus();
         }, 150);
       }
-      setIsTagManageMode(false);
       setAiNotice(null);
       setIsAiRunning(false);
       setInputMode('basic');
     }
-  }, [isOpen, editItem, initialDate, quickTags]);
+  }, [isOpen, editItem, initialDate]);
 
   if (!isOpen) return null;
 
@@ -180,12 +174,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     const finalBenefit =
       finalType === 'instant' ? 0 : parseInt(benefitAmount.replace(/,/g, ''), 10) || 0;
     const finalTargetDate = date || getTodayString();
+    // 태그는 이 플랜에만 붙는다. 자주 쓰는 태그 목록은 설정 탭에서만 바뀐다.
+    // 여기서 저절로 등록하면 정규식·AI가 채운 가게 이름이나 '기타'가 목록에 쌓인다.
     const trimmedTag = dealTag.trim();
-
-    // 직접 입력한 새 태그는 quickTags에 자동으로 등록하여 다음번 원터치 재사용 지원
-    if (trimmedTag && !quickTags.includes(trimmedTag)) {
-      onAddTag(trimmedTag);
-    }
 
     const item: DealItem = {
       id: editItem ? editItem.id : generateId(),
@@ -681,58 +672,26 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                 <span className="text-[11px] text-slate-400 font-medium">
                   자주 쓰는 태그
                 </span>
-                {quickTags.length > 0 && onDeleteTag && (
-                  <button
-                    type="button"
-                    onClick={() => setIsTagManageMode(!isTagManageMode)}
-                    className={`text-[10px] px-2 py-0.5 rounded-md transition font-medium ${
-                      isTagManageMode
-                        ? 'bg-rose-950/70 text-rose-300 border border-rose-800/60 font-bold'
-                        : 'text-slate-400 hover:text-slate-200 bg-slate-800/80 border border-slate-700/60'
-                    }`}
-                  >
-                    {isTagManageMode ? '편집 완료' : '태그 삭제/정리'}
-                  </button>
-                )}
+                <span className="text-[10px] text-slate-500">추가·삭제는 설정 탭에서</span>
               </div>
 
               <div className="flex flex-wrap gap-1.5">
                 {quickTags.map((tag) => {
                   const isSelected = dealTag.trim().toLowerCase() === tag.toLowerCase();
                   return (
-                    <div
+                    <button
                       key={tag}
-                      className={`inline-flex items-center rounded-lg text-xs font-medium transition-all ${
+                      type="button"
+                      onClick={() => setDealTag(tag)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1 active:scale-95 transition-all ${
                         isSelected
                           ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                           : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60'
                       }`}
                     >
-                      <button
-                        type="button"
-                        onClick={() => setDealTag(tag)}
-                        className="px-2.5 py-1 flex items-center gap-1 active:scale-95 transition"
-                      >
-                        {isSelected && <Check className="w-3 h-3" />}
-                        <span>{tag}</span>
-                      </button>
-
-                      {isTagManageMode && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (dealTag === tag) setDealTag('');
-                            onDeleteTag?.(tag);
-                          }}
-                          className="pr-2 pl-0.5 py-1 text-slate-400 hover:text-rose-400 active:scale-90 transition"
-                          title={`${tag} 삭제`}
-                          aria-label={`${tag} 삭제`}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
+                      {isSelected && <Check className="w-3 h-3" />}
+                      <span>{tag}</span>
+                    </button>
                   );
                 })}
               </div>
