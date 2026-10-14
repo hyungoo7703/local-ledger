@@ -25,14 +25,21 @@ function escapeRegExp(str: string): string {
 // 금액 표기는 아래 한 곳에서만 정의한다.
 // 예전에 이 정의가 세 군데 흩어져 있어 '만' 처리 버그가 각각 따로 존재했다.
 const AMOUNT_SOURCE = String.raw`\d+만\s*\d+천|\d+만|\d+천|\d+(?:,\d{3})*`;
+
+// 혜택 키워드도 한 곳에서만 정의한다. 긴 것을 앞에 둬야 '청구할인'이 '할인'으로 잘려 "청구"가 남지 않는다.
+const BENEFIT_KEYWORD = String.raw`청구할인|결제일할인|캐시백|페이백|적립|포인트|할인`;
+// "적립 6000", "캐시백: 3천"처럼 키워드 뒤에 금액. 띄어 써도 잡아야 아래 패턴보다 먼저 맞는다.
 const BENEFIT_BEFORE_AMOUNT = new RegExp(
-  String.raw`(?:청구할인|결제일할인|적립|캐시백|할인\s*[:=]?\s*|-)(${AMOUNT_SOURCE})(?:원)?`,
+  String.raw`(?:${BENEFIT_KEYWORD}|-)\s*[:=]?\s*(${AMOUNT_SOURCE})(?:원)?`,
   'i'
 );
+// "6000원 적립"처럼 금액 뒤에 키워드. "60000 적립"의 결제 금액을 잘못 집어갈 수 있어 쓰는 쪽에서 한 번 더 거른다.
 const BENEFIT_AFTER_AMOUNT = new RegExp(
-  String.raw`(${AMOUNT_SOURCE})(?:원)?\s*(?:청구할인|적립|캐시백|할인)`,
+  String.raw`(${AMOUNT_SOURCE})(?:원)?\s*(?:${BENEFIT_KEYWORD})`,
   'i'
 );
+// 금액 없이 남은 혜택 키워드. 제목이 "빕스 캐시백"이 되지 않게 지운다.
+const LEFTOVER_BENEFIT_KEYWORD = new RegExp(String.raw`(^|\s)(?:${BENEFIT_KEYWORD})(?=\s|$)`, 'g');
 
 // 결제 수단 표기. 맨 '카드'는 넣지 않는다. '체크카드'도 '신한카드'도 '카드'라서
 // 이것만으로는 신용인지 알 수 없고, 태그 이름과도 부딪힌다.
@@ -104,19 +111,8 @@ export function parseQuickEntry(
   const { payMethod, rest } = extractPayMethod(text);
   text = rest;
 
-  // 3. 할인/적립 금액 명시 패턴 추출 (예: "청구할인 2000", "적립 24000", "할인 3000", "-3000")
-  let benefitAmount = 0;
-  const explicitBenefitMatch = text.match(BENEFIT_BEFORE_AMOUNT) || text.match(BENEFIT_AFTER_AMOUNT);
-
-  if (explicitBenefitMatch) {
-    benefitAmount = parseAmount(explicitBenefitMatch[1]);
-    if (benefitType === 'instant' && !/즉시|쿠폰/.test(explicitBenefitMatch[0])) {
-      benefitType = 'bill_discount';
-    }
-    text = text.replace(explicitBenefitMatch[0], ' ').trim();
-  }
-
-  // 4. 태그 추출 (사용자 태그 우선, 긴 태그부터 매칭해 '삼성LINK'가 '삼성'에 가려지지 않게)
+  // 3. 태그 추출 (사용자 태그 우선, 긴 태그부터 매칭해 '삼성LINK'가 '삼성'에 가려지지 않게)
+  // 혜택 금액보다 먼저 뗀다. 기본 태그 '카드청구할인'이 혜택 키워드로 먼저 잘려 "카드"가 남는 것을 막는다.
   let dealTag = '';
   const candidateTags = [...new Set([...userTags, ...COMMON_TAGS])].sort(
     (a, b) => b.length - a.length
@@ -128,6 +124,26 @@ export function parseQuickEntry(
       text = text.replace(regex, ' ').trim();
       break;
     }
+  }
+
+  // 4. 혜택 금액 명시 패턴 추출 (예: "청구할인 2000", "적립 24000", "캐시백 3천", "6000원 적립", "-3000")
+  let benefitAmount = 0;
+  let explicitBenefitMatch = text.match(BENEFIT_BEFORE_AMOUNT);
+  if (!explicitBenefitMatch) {
+    const after = text.match(BENEFIT_AFTER_AMOUNT);
+    // "빕스 60000 캐시백"처럼 혜택 금액 없이 키워드만 붙었으면 그 숫자는 결제 금액이다.
+    // 결제 금액으로 쓸 다른 숫자가 남을 때만 혜택으로 본다.
+    if (after && extractAmounts(cutOut(text, [matchRange(after)])).length > 0) {
+      explicitBenefitMatch = after;
+    }
+  }
+
+  if (explicitBenefitMatch) {
+    benefitAmount = parseAmount(explicitBenefitMatch[1]);
+    if (benefitType === 'instant' && !/즉시|쿠폰/.test(explicitBenefitMatch[0])) {
+      benefitType = 'bill_discount';
+    }
+    text = cutOut(text, [matchRange(explicitBenefitMatch)]);
   }
 
   // 5. 남은 숫자들 추출 (결제 금액 및 남은 혜택금액 처리)
@@ -146,7 +162,7 @@ export function parseQuickEntry(
   }
 
   // 6. 남은 텍스트는 제목
-  let title = text.replace(/\s+/g, ' ').trim();
+  let title = text.replace(LEFTOVER_BENEFIT_KEYWORD, ' ').replace(/\s+/g, ' ').trim();
   if (!title && dealTag) {
     title = dealTag;
   } else if (!title) {
@@ -206,12 +222,17 @@ function extractAmounts(text: string): Amount[] {
 }
 
 /** 위치 기준으로 잘라낸다. 문자열 replace를 쓰면 "11번가 11"처럼 같은 숫자가 앞에 또 있을 때 엉뚱한 곳을 지운다. */
-function cutOut(text: string, ranges: Amount[]): string {
+function cutOut(text: string, ranges: Pick<Amount, 'start' | 'end'>[]): string {
   let out = text;
   for (const { start, end } of [...ranges].sort((a, b) => b.start - a.start)) {
     out = `${out.slice(0, start)} ${out.slice(end)}`;
   }
   return out.replace(/\s+/g, ' ').trim();
+}
+
+function matchRange(match: RegExpMatchArray): Pick<Amount, 'start' | 'end'> {
+  const start = match.index ?? 0;
+  return { start, end: start + match[0].length };
 }
 
 function parseAmount(str: string): number {
