@@ -6,7 +6,7 @@ const PREIMPORT_KEY_PREFIX = 'LOCAL_LEDGER_PREIMPORT_';
 const MAX_SNAPSHOTS = 5;
 
 const BACKUP_APP_ID = 'local-ledger';
-const BACKUP_SCHEMA_VERSION = 5;
+const BACKUP_SCHEMA_VERSION = 6;
 
 export const DEFAULT_QUICK_TAGS = [
   '삼성LINK',
@@ -99,11 +99,32 @@ export function calculateCreditBillDiscountWon(deals: DealItem[]): number {
   return deals.reduce((sum, d) => sum + creditBillDiscountOf(d), 0);
 }
 
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/** 이전 달 메모 중 남겨두는 가장 오래된 달 ('YYYY-MM'). 달이 바뀐 뒤에도 지난달 메모는 한 달 더 볼 수 있다. */
+export function oldestKeptMemoMonth(now = new Date()): string {
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** 형식이 맞고, 내용이 있고, 보관 기간 안인 메모만 남긴다. 월 메모는 일부러 휘발시키는 데이터다. */
+export function sanitizeMonthlyMemos(raw: unknown, now = new Date()): Record<string, string> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const oldest = oldestKeptMemoMonth(now);
+  return Object.fromEntries(
+    Object.entries(raw).filter(
+      (entry): entry is [string, string] =>
+        MONTH_KEY.test(entry[0]) && entry[0] >= oldest && typeof entry[1] === 'string' && entry[1].trim() !== ''
+    )
+  );
+}
+
 function createInitialState(): AppState {
   return {
     deals: [],
     salaryConfig: { ...DEFAULT_SALARY_CONFIG, deductions: [], checklist: [] },
-    quickTags: [...DEFAULT_QUICK_TAGS]
+    quickTags: [...DEFAULT_QUICK_TAGS],
+    monthlyMemos: {}
   };
 }
 
@@ -205,7 +226,7 @@ export function loadAppState(): AppState {
       isCompleted: Boolean(d.isCompleted),
       createdAt: Number(d.createdAt || Date.now())
     }));
-    return { ...parsed, deals };
+    return { ...parsed, deals, monthlyMemos: sanitizeMonthlyMemos(parsed.monthlyMemos) };
   } catch (err) {
     console.warn('Quarantining unreadable state:', err);
     archiveRaw(BROKEN_KEY_PREFIX, raw);
@@ -331,7 +352,8 @@ export function parseBackupJson(jsonStr: string): { state: AppState; summary: Ba
   const state: AppState = {
     deals,
     salaryConfig,
-    quickTags: cleanTags.length > 0 ? cleanTags : [...DEFAULT_QUICK_TAGS]
+    quickTags: cleanTags.length > 0 ? cleanTags : [...DEFAULT_QUICK_TAGS],
+    monthlyMemos: sanitizeMonthlyMemos(parsed.monthlyMemos)
   };
 
   const exportedAt = typeof parsed.exportedAt === 'string' ? parsed.exportedAt : undefined;

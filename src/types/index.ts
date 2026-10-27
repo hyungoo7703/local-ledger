@@ -56,4 +56,6 @@ export interface AppState {
   deals: DealItem[];
   salaryConfig: SalaryConfig;
   quickTags: string[]; // 자주 쓰는 혜택 태그 목록
+  // 달마다 쓰는 휘발성 메모. 키는 'YYYY-MM'. 지난달보다 오래된 메모는 불러올 때 지운다.
+  monthlyMemos: Record<string, string>;
 }

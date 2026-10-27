@@ -1,13 +1,15 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Calendar, PiggyBank, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, PiggyBank, Settings, StickyNote } from 'lucide-react';
 import { formatMonthDisplay } from '../utils/formatters';
+
+export type AppTab = 'memo' | 'calendar' | 'salary' | 'settings';
 
 interface HeaderProps {
   currentYear: number;
   currentMonth: number;
-  activeTab: 'calendar' | 'salary' | 'settings';
+  activeTab: AppTab;
   onMonthChange: (year: number, month: number) => void;
-  onTabChange: (tab: 'calendar' | 'salary' | 'settings') => void;
+  onTabChange: (tab: AppTab) => void;
   onResetToCurrentMonth: () => void;
 }
 
@@ -51,8 +53,19 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Tab Buttons */}
         <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/50">
           <button
+            onClick={() => onTabChange('memo')}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'memo'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <StickyNote className="w-3.5 h-3.5" />
+            <span>메모</span>
+          </button>
+          <button
             onClick={() => onTabChange('calendar')}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'calendar'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
@@ -63,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
           <button
             onClick={() => onTabChange('salary')}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'salary'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
@@ -85,8 +98,8 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Month Navigator (visible on plan tab) */}
-      {activeTab === 'calendar' && (
+      {/* Month Navigator (visible on plan and memo tabs) */}
+      {(activeTab === 'calendar' || activeTab === 'memo') && (
         <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-800/50">
           <div className="flex items-center gap-1">
             <button

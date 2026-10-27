@@ -7,11 +7,13 @@ import {
   calculateCreditLimitManwon,
   calculateCreditSpendWon,
   calculateCreditBillDiscountWon,
-  creditBillDiscountOf
+  creditBillDiscountOf,
+  oldestKeptMemoMonth
 } from './utils/storage';
 import { getTodayString } from './utils/formatters';
 import { requestPersistentStorage, PersistState } from './utils/persistence';
-import { Header } from './components/Header';
+import { Header, AppTab } from './components/Header';
+import { MonthlyMemo } from './components/MonthlyMemo';
 import { StatsCard } from './components/StatsCard';
 import { DealCalendar } from './components/DealCalendar';
 import { DealList } from './components/DealList';
@@ -29,7 +31,7 @@ export const App: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState<number>(today.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
 
-  const [activeTab, setActiveTab] = useState<'calendar' | 'salary' | 'settings'>('calendar');
+  const [activeTab, setActiveTab] = useState<AppTab>('calendar');
   const [listFilterMode, setListFilterMode] = useState<'selectedDate' | 'allMonth'>('selectedDate');
 
   // Modal states
@@ -189,6 +191,15 @@ export const App: React.FC = () => {
     }));
   };
 
+  // 빈 메모는 키째 지워 저장소에 빈 달이 쌓이지 않게 한다.
+  // 공백만 있을 때는 지우지 않는다. 첫 줄에 Enter를 치면 입력이 사라져 버리기 때문이다.
+  const handleChangeMemo = (text: string) => {
+    setAppState((prev) => {
+      const { [monthPrefix]: _removed, ...rest } = prev.monthlyMemos;
+      return { ...prev, monthlyMemos: text ? { ...rest, [monthPrefix]: text } : rest };
+    });
+  };
+
   const handleUpdateSalaryConfig = (newConfig: SalaryConfig) => {
     setAppState((prev) => ({
       ...prev,
@@ -252,6 +263,16 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 p-4 space-y-4 pb-24 overflow-y-auto">
+        {activeTab === 'memo' && (
+          <MonthlyMemo
+            year={currentYear}
+            month={currentMonth}
+            text={appState.monthlyMemos[monthPrefix] ?? ''}
+            isExpired={monthPrefix < oldestKeptMemoMonth()}
+            onChange={handleChangeMemo}
+          />
+        )}
+
         {activeTab === 'calendar' && (
           <>
             {/* Top Monthly Stats summary */}
