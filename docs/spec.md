@@ -150,12 +150,19 @@ AI에게는 `unknown`을 고를 수 있게 주고 프롬프트에서 **추측을
 | 항목 | 결정 |
 | --- | --- |
 | 제공자 | Google Gemini (Developer API) |
-| 기본 모델 | `gemini-3.8-flash` (설정에서 변경 가능) |
-| 대체 모델 | `gemini-3.7-flash` (설정에서 변경·해제 가능) |
+| 기본 모델 | `gemini-3.5-flash-lite` (설정에서 변경 가능) |
+| 대체 모델 | `gemini-3.8-flash` (설정에서 변경·해제 가능) |
 | 엔드포인트 | `https://generativelanguage.googleapis.com/v1beta` |
 | 인증 | `x-goog-api-key` 헤더 (쿼리 파라미터 `?key=` 대신 — URL·로그 유출 방지) |
 | 기본 상태 | **꺼짐.** 키를 넣어야만 동작 |
 | 요금제 | 무료 티어 전제. 한도 초과 시 대체 모델을 시도하고, 그래도 안 되면 오류를 표시 |
+
+> 2026-11-10 변경. 이전에는 기본 `gemini-3.8-flash`, 대체 `gemini-3.7-flash`였다.
+> 3.7 flash가 요청을 3.8 flash로 자동으로 넘기기 시작해서(구글 deprecations 문서), 폴백이 결국 같은 모델로 가
+> 아무 역할을 못 했다. **기본과 대체는 서로 다른 계열로 둔다.** 기본을 lite로 둔 것은 안정성 때문이다.
+> 한 줄 입력을 JSON으로 옮기는 일이라 lite로 충분하고(계산은 앱이 한다, 5.4), 무료 한도가 더 넉넉하다.
+>
+> 코드 기본값은 키를 처음 저장할 때만 쓰인다. **이미 키를 저장한 기기는 설정 탭에서 두 칸을 직접 바꿔야 한다.**
 
 CORS 확인 완료: preflight가 `x-goog-api-key`를 허용하고, GitHub Pages 오리진에
 `Access-Control-Allow-Origin`이 응답된다. 별도 프록시 서버가 필요 없다.

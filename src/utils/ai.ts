@@ -2,19 +2,21 @@ import { BenefitType, PayMethod, BENEFIT_TYPES, isBenefitType } from '../types';
 const AI_CONFIG_KEY = 'LOCAL_LEDGER_AI_CONFIG';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-export const DEFAULT_AI_MODEL = 'gemini-3.8-flash';
+// 기본은 무료 한도가 넉넉한 lite, 막히면 다른 계열인 3.8 flash로 넘긴다.
+// 같은 계열끼리 묶으면 폴백이 같은 모델로 다시 가서 소용이 없다 (spec 5.1).
+export const DEFAULT_AI_MODEL = 'gemini-3.5-flash-lite';
 
 // 참고용 목록. 목록에 없는 모델명도 직접 입력할 수 있어야 한다
 // (구글이 모델을 새로 내놓아도 앱 수정 없이 쓸 수 있도록).
 export const KNOWN_MODELS = [
+  'gemini-3.5-flash-lite',
   'gemini-3.8-flash',
   'gemini-3.7-flash',
   'gemini-3.6-flash',
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite'
+  'gemini-3.5-flash'
 ];
 
-export const DEFAULT_FALLBACK_MODEL = 'gemini-3.7-flash';
+export const DEFAULT_FALLBACK_MODEL = 'gemini-3.8-flash';
 
 export interface AiConfig {
   apiKey: string;
