@@ -254,7 +254,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-bold text-white tracking-tight">월급 차감 룰</h3>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[11px] text-slate-400">
                 저축·소비를 만원 단위로 차감
               </p>
             </div>
