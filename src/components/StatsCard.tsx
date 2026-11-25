@@ -1,6 +1,17 @@
-import React from 'react';
-import { TrendingDown, Sparkles, CheckCircle2, Wallet, CreditCard, Coins, Banknote, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { TrendingDown, Sparkles, CheckCircle2, Wallet, CreditCard, Coins, Banknote, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatCompactKRW, formatKRW } from '../utils/formatters';
+
+// 요약을 펼쳐 둘지는 기기에만 기억하는 화면 설정이다. 가계부 데이터나 백업에는 넣지 않는다.
+const EXPANDED_KEY = 'LOCAL_LEDGER_STATS_EXPANDED';
+
+function loadIsExpanded(): boolean {
+  try {
+    return localStorage.getItem(EXPANDED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 interface StatsCardProps {
   totalPlannedSpend: number; // 실제 결제(승인) 예정 총액 (원)
@@ -29,6 +40,18 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   creditLimitWon,
   creditBillDiscount
 }) => {
+  // 기본은 접힌 상태다. 다 펼치면 첫 화면을 요약이 거의 다 차지해 달력과 목록이 밀려난다.
+  const [isExpanded, setIsExpanded] = useState(loadIsExpanded);
+  const toggleExpanded = () => {
+    const next = !isExpanded;
+    setIsExpanded(next);
+    try {
+      localStorage.setItem(EXPANDED_KEY, next ? '1' : '0');
+    } catch {
+      // 기억하지 못해도 이번 화면에서는 그대로 동작한다
+    }
+  };
+
   // 혜택(청구할인, 포인트 적립, 캐시백)이 발생하면 한계 소비 예산이 늘어남
   const adjustedBudgetWon = baseBudgetWon + totalPostBenefits;
   const netSpend = Math.max(0, totalPlannedSpend - totalPostBenefits);
@@ -49,7 +72,35 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 
   return (
     <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 rounded-2xl p-4 border border-slate-800 shadow-xl space-y-3">
+      {/* 접힌 상태의 한 줄 요약 겸 펼치기 버튼 */}
+      <button
+        type="button"
+        onClick={toggleExpanded}
+        aria-expanded={isExpanded}
+        className="w-full flex items-center justify-between gap-2 text-xs text-slate-300"
+      >
+        {isExpanded ? (
+          <span className="font-semibold">이번 달 요약</span>
+        ) : (
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-left">
+            <span className="whitespace-nowrap">
+              소비 <strong className="text-white">{formatCompactKRW(totalPlannedSpend)}</strong>
+            </span>
+            {totalPostBenefits > 0 && (
+              <span className="whitespace-nowrap text-pink-300">
+                혜택 <strong>+{formatCompactKRW(totalPostBenefits)}</strong>
+              </span>
+            )}
+          </span>
+        )}
+        <span className="flex items-center gap-0.5 shrink-0 text-[11px] text-slate-400">
+          {isExpanded ? '간단히' : '자세히'}
+          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </span>
+      </button>
+
       {/* Top row: Planned Spend & Post Benefits */}
+      {isExpanded && (
       <div className="grid grid-cols-2 gap-3">
         {/* Planned Spend Card */}
         <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/40 relative overflow-hidden flex flex-col justify-between">
@@ -118,6 +169,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
           )}
         </div>
       </div>
+      )}
 
       {/* Budget Bar & Progress */}
       {baseBudgetWon > 0 && (
@@ -155,6 +207,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
           </div>
 
           {/* Bottom Row: Detail Breakdown. 좁은 화면에서는 금액을 자르지 않고 다음 줄로 넘긴다 */}
+          {isExpanded && (
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-400 pt-0.5">
             <div className="whitespace-nowrap">
               <span>소비 </span>
@@ -173,6 +226,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
               )}
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -207,6 +261,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
             />
           </div>
 
+          {isExpanded && (
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-400">
             <div className="whitespace-nowrap">
               <span>신용 </span>
@@ -222,8 +277,9 @@ export const StatsCard: React.FC<StatsCardProps> = ({
               )}
             </div>
           </div>
+          )}
 
-          {isCreditOver && (
+          {isExpanded && isCreditOver && (
             <p className="flex items-start gap-1.5 text-[11px] text-rose-300 font-medium leading-relaxed pt-0.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               신용을 한도보다 {formatKRW(creditSpend - adjustedCreditLimitWon)} 더 잡았습니다. 남은 소비는 계좌/체크로
@@ -234,6 +290,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
       )}
 
       {/* Completion status */}
+      {isExpanded && (
       <div className="flex items-center justify-between text-xs text-slate-400 px-1 pt-0.5">
         <div className="flex items-center gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />
@@ -248,6 +305,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
           </span>
         )}
       </div>
+      )}
     </div>
   );
 };
