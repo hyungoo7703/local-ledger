@@ -725,8 +725,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 pt-2">
+          {/* Action Buttons. 창이 화면 두 장 길이라 맨 아래에 두면 끝까지 내려야 눌린다. 창 아래에 붙여 둔다 */}
+          <div className="sticky bottom-0 z-10 -mx-5 px-5 py-3 flex items-center gap-2 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800">
             {editItem && onDelete && (
               <button
                 type="button"
