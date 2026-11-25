@@ -15,11 +15,10 @@ concurrency:
   group: 'pages'
   cancel-in-progress: false
 
+# 빌드와 배포를 다른 작업으로 나눈다. 한 작업 안에서 결과물을 올리자마자 배포하면
+# GitHub가 방금 올린 결과물을 아직 찾지 못해 배포가 실패하는 일이 있었다.
 jobs:
-  build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -46,6 +45,13 @@ jobs:
         with:
           path: './dist'
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
