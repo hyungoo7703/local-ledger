@@ -95,6 +95,11 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [aiNotice, setAiNotice] = useState<{ kind: 'ok' | 'warn' | 'error'; text: string } | null>(null);
   const [inputMode, setInputMode] = useState<'basic' | 'ai'>('basic');
 
+  const hasCreditLimit = creditLimitWon > 0;
+  // 이 건을 빼고도 신용 한도가 이미 찼는지
+  const isCreditAlreadyFull =
+    hasCreditLimit && creditSpentOthersWon >= creditLimitWon + creditBillDiscountOthersWon;
+
   const quickInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,7 +122,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         setFinalPrice('');
         // 새 플랜은 신용으로 시작한다. 신용을 계좌로 잘못 적으면 한도 경고가 아예 안 뜨지만,
         // 반대로 적으면 경고가 한 번 더 뜰 뿐이다. 놓치는 쪽이 더 위험하다.
-        setPayMethod('credit');
+        // 단 한도를 이미 다 쓴 달은 계좌/체크로 시작한다. 그때는 어차피 계좌로 써야 하고,
+        // 신용이 찼다는 사실은 아래 안내로 계속 보여준다.
+        setPayMethod(isCreditAlreadyFull ? 'debit' : 'credit');
         setBenefitType('instant');
         setBenefitAmount('');
         setDealTag('');
@@ -256,15 +263,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
 
   // 이 건을 등록하면 신용 한도를 넘는지 미리 보여준다. 한도는 신용 청구할인만큼만 늘어나며,
   // 지금 입력 중인 건이 신용 + 청구할인이면 그 할인도 바로 반영한다 (storage의 creditBillDiscountOf와 같은 규칙).
-  const hasCreditLimit = creditLimitWon > 0;
   const thisCreditBillDiscount =
     payMethod === 'credit' && benefitType === 'bill_discount' ? Math.min(parsedBenefit, parsedPaid) : 0;
   const creditLimitAfterSave = creditLimitWon + creditBillDiscountOthersWon + thisCreditBillDiscount;
   const creditAfterSave = creditSpentOthersWon + (payMethod === 'credit' ? parsedPaid : 0);
   const creditOverWon = creditAfterSave - creditLimitAfterSave;
   const isCreditOver = hasCreditLimit && payMethod === 'credit' && creditOverWon > 0;
-  const isCreditAlreadyFull =
-    hasCreditLimit && creditSpentOthersWon >= creditLimitWon + creditBillDiscountOthersWon;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -528,6 +532,13 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                 <span className="whitespace-nowrap">신용</span>
               </button>
             </div>
+
+            {!editItem && payMethod === 'debit' && isCreditAlreadyFull && (
+              <p className="mt-2 p-2.5 rounded-xl text-[11px] border leading-relaxed bg-amber-950/30 border-amber-700/40 text-amber-200">
+                이번 달 신용 한도를 다 써서 <strong>계좌/체크</strong>로 시작합니다. 신용으로 결제했다면
+                신용을 눌러 주세요.
+              </p>
+            )}
 
             {/* 한도를 넘겨도 등록은 막지 않는다. 대신 무엇을 넘기는지는 정확히 보여준다. */}
             {payMethod === 'credit' && hasCreditLimit && (
