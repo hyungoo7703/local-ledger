@@ -3,6 +3,7 @@ import { SalaryConfig, SalaryDeductionItem, MonthlyChecklistItem } from '../type
 import { PiggyBank, Plus, Trash2, ShoppingBag, Landmark, ArrowRight, Check, AlertCircle, ListChecks, CheckSquare, Square, RefreshCw, X, CreditCard, AlertTriangle } from 'lucide-react';
 import { formatCompactKRW, generateId } from '../utils/formatters';
 import { calculateCreditLimitManwon, calculateRemainingSalary, calculateSpendingLimitManwon, calculateTotalDeductions } from '../utils/storage';
+import { useBackLayer } from '../hooks/useBackLayer';
 
 interface SalaryRulesProps {
   config: SalaryConfig;
@@ -34,6 +35,7 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
   const [deductions, setDeductions] = useState<SalaryDeductionItem[]>(config.deductions || []);
   const [checklist, setChecklist] = useState<MonthlyChecklistItem[]>(config.checklist || []);
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
+  useBackLayer(isChecklistModalOpen, () => setIsChecklistModalOpen(false));
 
   // Quick Add Form States
   const [quickOneLiner, setQuickOneLiner] = useState('');

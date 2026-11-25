@@ -12,6 +12,7 @@ import {
 } from './utils/storage';
 import { getTodayString } from './utils/formatters';
 import { requestPersistentStorage, PersistState } from './utils/persistence';
+import { useBackLayer } from './hooks/useBackLayer';
 import { Header, AppTab } from './components/Header';
 import { MonthlyMemo } from './components/MonthlyMemo';
 import { StatsCard } from './components/StatsCard';
@@ -218,6 +219,16 @@ export const App: React.FC = () => {
     setIsQuickAddOpen(true);
   };
 
+  const closeQuickAdd = () => {
+    setIsQuickAddOpen(false);
+    setEditDealItem(null);
+  };
+
+  // 안드로이드 뒤로가기: 등록 창이 열려 있으면 창을 닫고, 다른 탭이면 플랜 탭으로 돌아온다.
+  // 플랜 탭에서 누르면 원래대로 앱이 꺼진다. 달 이동은 뒤로가기로 되돌리지 않는다.
+  useBackLayer(activeTab !== 'calendar', () => setActiveTab('calendar'));
+  useBackLayer(isQuickAddOpen, closeQuickAdd);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans max-w-lg mx-auto border-x border-slate-900 shadow-2xl relative">
       {/* Sticky Header */}
@@ -367,10 +378,7 @@ export const App: React.FC = () => {
         creditLimitWon={creditLimitWon}
         creditSpentOthersWon={creditOthers.spentWon}
         creditBillDiscountOthersWon={creditOthers.billDiscountWon}
-        onClose={() => {
-          setIsQuickAddOpen(false);
-          setEditDealItem(null);
-        }}
+        onClose={closeQuickAdd}
         onSave={handleSaveDeal}
         onDelete={handleDeleteDeal}
       />
