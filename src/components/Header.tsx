@@ -45,13 +45,13 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Top Brand Bar */}
       <div className="flex items-center justify-between py-2">
         <div>
-          <h1 className="text-base font-bold tracking-tight text-white">
+          <h1 className="text-base font-bold tracking-tight text-white whitespace-nowrap">
             로컬 가계부
           </h1>
         </div>
 
-        {/* Tab Buttons */}
-        <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/50">
+        {/* Tab Buttons. 탭이 4개라 폭 380px 미만(360px 폰)에서는 아이콘을 숨겨야 글자가 두 줄로 꺾이지 않는다 */}
+        <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/50 whitespace-nowrap">
           <button
             onClick={() => onTabChange('memo')}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <StickyNote className="w-3.5 h-3.5" />
+            <StickyNote className="w-3.5 h-3.5 hidden min-[380px]:block" />
             <span>메모</span>
           </button>
           <button
@@ -71,7 +71,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Calendar className="w-3.5 h-3.5" />
+            <Calendar className="w-3.5 h-3.5 hidden min-[380px]:block" />
             <span>플랜</span>
           </button>
           <button
@@ -82,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <PiggyBank className="w-3.5 h-3.5" />
+            <PiggyBank className="w-3.5 h-3.5 hidden min-[380px]:block" />
             <span>월급 룰</span>
           </button>
           <button
