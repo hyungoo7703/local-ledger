@@ -63,13 +63,13 @@ export const StatsCard: React.FC<StatsCardProps> = ({
             <div className="text-lg font-bold text-white tracking-tight">
               {formatCompactKRW(totalPlannedSpend)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5 whitespace-nowrap truncate">
+            <div className="text-[11px] text-slate-400 mt-0.5">
               결제 {formatKRW(totalPlannedSpend)}
             </div>
           </div>
 
           {totalPostBenefits > 0 && (
-            <div className="mt-2 pt-1.5 border-t border-slate-700/50 text-[11px] text-indigo-300 font-medium whitespace-nowrap truncate">
+            <div className="mt-2 pt-1.5 border-t border-slate-700/50 text-[11px] text-indigo-300 font-medium">
               실질 순소비 {formatKRW(netSpend)}
             </div>
           )}
@@ -112,7 +112,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
           </div>
 
           {totalPostBenefits > 0 && (
-            <div className="mt-2 pt-1.5 border-t border-pink-500/20 text-[11px] text-emerald-400 font-semibold whitespace-nowrap truncate">
+            <div className="mt-2 pt-1.5 border-t border-pink-500/20 text-[11px] text-emerald-400 font-semibold">
               예산 +{formatCompactKRW(totalPostBenefits)} 확대
             </div>
           )}
@@ -154,9 +154,9 @@ export const StatsCard: React.FC<StatsCardProps> = ({
             />
           </div>
 
-          {/* Bottom Row: Detail Breakdown */}
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-            <div className="truncate">
+          {/* Bottom Row: Detail Breakdown. 좁은 화면에서는 금액을 자르지 않고 다음 줄로 넘긴다 */}
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-400 pt-0.5">
+            <div className="whitespace-nowrap">
               <span>소비 </span>
               <strong className="text-slate-200">{formatCompactKRW(totalPlannedSpend)}</strong>
             </div>
@@ -207,8 +207,8 @@ export const StatsCard: React.FC<StatsCardProps> = ({
             />
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <div className="truncate">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-400">
+            <div className="whitespace-nowrap">
               <span>신용 </span>
               <strong className="text-slate-200">{formatCompactKRW(creditSpend)}</strong>
             </div>
