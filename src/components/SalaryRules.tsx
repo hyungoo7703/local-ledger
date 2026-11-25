@@ -637,10 +637,10 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
             {deductions.map((item) => (
               <div
                 key={item.id}
-                className="bg-slate-900/80 rounded-2xl p-3 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-3"
+                className="bg-slate-900/80 rounded-2xl p-3 border border-slate-800 hover:border-slate-700 transition space-y-2"
               >
-                {/* Left: Type tag & Name */}
-                <div className="flex items-center gap-2.5 min-w-0">
+                {/* 윗줄: 구분, 이름, 삭제. 한 줄에 금액 칸까지 넣으면 좁은 화면에서 이름이 한 글자만 남는다 */}
+                <div className="flex items-center gap-2.5">
                   <button
                     type="button"
                     onClick={() => handleToggleSpending(item.id)}
@@ -664,50 +664,44 @@ export const SalaryRules: React.FC<SalaryRulesProps> = ({
                     )}
                   </button>
 
-                  <span className="text-sm font-semibold text-white truncate">
+                  <span className="flex-1 min-w-0 text-sm font-semibold text-white truncate">
                     {item.name}
                   </span>
-                </div>
 
-                {/* Right: Amount & Step adjustment & Delete */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Step Buttons */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleStepAmount(item.id, -10)}
-                      className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-400"
-                      title="-10만원"
-                    >
-                      -10
-                    </button>
-                    <button
-                      onClick={() => handleStepAmount(item.id, 10)}
-                      className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-400"
-                      title="+10만원"
-                    >
-                      +10
-                    </button>
-                  </div>
-
-                  {/* Amount display / inline edit */}
-                  <div className="flex items-center gap-0.5">
-                    <input
-                      type="number"
-                      value={item.amountManwon}
-                      onChange={(e) => handleAmountChange(item.id, parseInt(e.target.value, 10) || 0)}
-                      className="w-14 bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-1 text-xs text-center font-bold text-white focus:outline-none focus:border-indigo-500"
-                    />
-                    <span className="text-xs text-slate-400">만</span>
-                  </div>
-
-                  {/* Delete button */}
                   <button
                     onClick={() => handleDeleteItem(item.id)}
-                    className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition"
+                    className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition shrink-0"
                     title="삭제"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                </div>
+
+                {/* 아랫줄: 금액 조절 */}
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => handleStepAmount(item.id, -10)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 active:scale-95 transition"
+                    title="-10만원"
+                  >
+                    -10
+                  </button>
+                  <button
+                    onClick={() => handleStepAmount(item.id, 10)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 active:scale-95 transition"
+                    title="+10만원"
+                  >
+                    +10
+                  </button>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={item.amountManwon}
+                      onChange={(e) => handleAmountChange(item.id, parseInt(e.target.value, 10) || 0)}
+                      className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-center font-bold text-white focus:outline-none focus:border-indigo-500"
+                    />
+                    <span className="text-xs text-slate-400">만원</span>
+                  </div>
                 </div>
               </div>
             ))}
